@@ -11,11 +11,15 @@ A product of Aeterna Atelier.
 | File | Purpose |
 |---|---|
 | `index.html` | The whole app. HTML, CSS, JavaScript and the clinical database in one file. |
-| `intro.webm`, `intro.mp4` | The Aeterna Atelier to Veinwise opening sequence. Plays on the first open of the day; change it under More -> Settings -> Opening sequence. |
+| `intro.webm`, `intro.mp4` | The Aeterna Atelier to Veinwise opening sequence, 4 seconds. Plays on the first open of the day; change it under More -> Settings -> Opening sequence. Audio is stripped because a splash autoplays muted and a phone should not make noise on a unit. |
 | `policies/` | The eight source PDFs. Reference -> Policies -> any policy -> **Open the full policy**. Precached for offline. |
 | `manifest.webmanifest` | Makes it installable as an app on your phone. |
 | `sw.js` | Service worker: offline support and notification handling. |
 | `icon-192.png`, `icon-512.png`, `icon-maskable-512.png` | Home screen icons. |
+
+The Veinwise mark and wordmark in the top bar, and the Aeterna Atelier mark in the footer, are all
+embedded in `index.html` as data URIs, so there are no extra image files to keep track of. The home
+screen icons are cut from the same Veinwise mark.
 
 ## Putting it on your phone (Samsung Fold)
 
