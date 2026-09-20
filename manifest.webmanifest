@@ -1,0 +1,36 @@
+{
+  "name": "Veinwise \u2014 vascular access",
+  "short_name": "Veinwise",
+  "description": "Clinical decision support for vascular access nurses. Right access, safer care, better outcomes.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#F3F2ED",
+  "theme_color": "#01311F",
+  "categories": [
+    "medical",
+    "productivity",
+    "health"
+  ],
+  "icons": [
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}
