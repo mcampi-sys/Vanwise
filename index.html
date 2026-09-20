@@ -1041,6 +1041,46 @@ pre.sample{
   .intro-vid{transition:none;}
 }
 
+/* ---------- Shift page: what is open and what is left ---------- */
+.oc-noroom{color:var(--ink-3);font-weight:400;font-size:17px;font-family:var(--font-ui);}
+.open-consult.is-compact{padding:12px 13px;}
+.open-consult.is-compact .oc-done{min-height:54px;font-size:16px;margin-top:10px;}
+
+.assign-empty{
+  display:flex;align-items:center;gap:13px;width:100%;text-align:left;
+  background:var(--surface-2);border:1px dashed var(--line);border-radius:var(--r);
+  padding:16px 15px;min-height:74px;
+}
+.assign-empty > span{
+  width:40px;height:40px;flex:none;border-radius:11px;background:var(--surface-3);
+  display:grid;place-items:center;color:var(--ink-3);
+}
+.assign-empty > span svg{width:21px;height:21px;}
+.assign-empty b{display:block;font-size:15.5px;font-weight:600;}
+.assign-empty span span,.assign-empty div span{
+  display:block;font-size:13px;color:var(--ink-3);line-height:1.4;margin-top:1px;
+}
+
+.todo-grid{display:grid;grid-template-columns:1fr;gap:9px;}
+@media (min-width:560px){.todo-grid{grid-template-columns:repeat(2,minmax(0,1fr));}}
+@media (min-width:1000px){.todo-grid{grid-template-columns:1fr;}}
+.todo-room{
+  background:var(--surface);border:1px solid var(--line);border-left:4px solid var(--accent);
+  border-radius:var(--r);box-shadow:var(--shadow);overflow:hidden;
+}
+.tr-head{
+  display:grid;grid-template-columns:1fr auto;align-items:center;gap:2px 9px;
+  width:100%;text-align:left;padding:12px 14px 9px;
+}
+.tr-no{
+  grid-column:1;font-family:var(--font-display);font-size:21px;font-weight:600;line-height:1.1;
+  overflow:hidden;text-overflow:ellipsis;
+}
+.tr-dev{grid-column:1;font-size:12.5px;color:var(--ink-3);}
+.tr-badge{grid-column:2;grid-row:1/3;align-self:center;}
+.tr-act{display:flex;gap:8px;padding:0 14px 12px;}
+.tr-act .btn{flex:1;min-height:46px;}
+
 </style>
 </head>
 <body>
@@ -3636,7 +3676,16 @@ VW.consult.tipLocations = ['SVC', 'Cavo-atrial junction', 'Right atrium (fluoro-
   }
   document.addEventListener('click', e => {
     const ct = e.target.closest('[data-ctype]');
-    if (ct) { const t = ct.dataset.ctype; closeSheet(); setTimeout(() => startConsult(t), 60); return; }
+    if (ct) {
+      const t = ct.dataset.ctype;
+      const sheet = ct.closest('.sheet');
+      const room = ((($('#ncRoom', sheet) || {}).value) || '').trim();
+      const statBtn = $('[data-nstat] button[data-v="stat"]', sheet);
+      const stat = !!statBtn && statBtn.getAttribute('aria-pressed') === 'true';
+      closeSheet();
+      setTimeout(() => startConsult(t, room, stat), 60);
+      return;
+    }
     const chip = e.target.closest('.chip[data-v]'); if (!chip) return;
     const g = chip.closest('[data-chipgroup]'); if (!g) return;
     const multi = g.dataset.multi === '1';
@@ -3982,25 +4031,46 @@ VW.consult.tipLocations = ['SVC', 'Cavo-atrial junction', 'Right atrium (fluoro-
   function openConsult(existing) {
     if (existing) return openConsultForm(existing.ctype || 'access', existing);
     openSheet({
-      title: 'What kind of consult?',
-      body: `<div class="hub">` + VW.consult.types.map(t =>
+      title: 'New consult',
+      body: `
+        <div class="field"><label for="ncRoom">Room / unit</label>
+          <input type="text" id="ncRoom" placeholder="e.g. 4W-12" autocomplete="off"
+            autocapitalize="characters" enterkeyhint="done"></div>
+        <div class="field">
+          <label class="field-label">Priority</label>
+          <div class="stat-toggle" data-nstat>
+            <button type="button" data-v="stat" aria-pressed="false">STAT</button>
+            <button type="button" class="calm" data-v="routine" aria-pressed="true">Routine</button>
+          </div>
+        </div>
+        <div class="section-label">What kind?</div>
+        <div class="hub">` + VW.consult.types.map(t =>
         `<button class="hub-card ${t.tone}" data-ctype="${t.id}">
           <span class="hub-ico">${I[t.icon] || I.plus}</span>
           <b>${esc(t.label)}</b><span>${esc(t.hint)}</span></button>`).join('') + `</div>
-        <div class="help" style="margin-top:12px">Pick the type and go. It waits in Consults with the clock running. Tick it off when you are finished and Veinwise stamps the time, then asks for the details.</div>`
+        <div class="help" style="margin-top:12px">Tapping a type starts it. It sits in Consults and on the Shift page with the room and the clock running. Tick it off when you finish and Veinwise stamps the time, then asks for the details.</div>`,
+      onOpen: back => {
+        $$('[data-nstat] button', back).forEach(btn => btn.addEventListener('click', () => {
+          $$('[data-nstat] button', back).forEach(x => x.setAttribute('aria-pressed', 'false'));
+          btn.setAttribute('aria-pressed', 'true');
+        }));
+      }
     });
   }
 
   /* an open consult is a real event, just not filled in yet */
-  function startConsult(type) {
+  function startConsult(type, room, stat) {
     const sh = S.current; if (!sh) return;
     const now = Date.now();
-    sh.events.push({ id: uid(), kind: 'consult', ctype: type, pending: true, started: now, at: now, stat: false });
+    sh.events.push({
+      id: uid(), kind: 'consult', ctype: type, pending: true,
+      started: now, at: now, stat: !!stat, room: room || ''
+    });
     sh.events.sort((a, b) => a.at - b.at);
     save(true);
     const t = VW.consult.types.find(x => x.id === type);
-    toast((t ? t.label : 'Consult') + ' started');
-    if (active !== 'consults') go('consults'); else render();
+    toast((room ? room + ' · ' : '') + (t ? t.label : 'Consult') + ' started');
+    render();
   }
 
   /* the tick: stamp the finish time, then let the details out */
@@ -4433,10 +4503,59 @@ VW.consult.tipLocations = ['SVC', 'Cavo-atrial junction', 'Right atrium (fluoro-
     html += `<div class="shift-cols"><div>`;
 
     html += bigActions(st.c);
+
+    /* what he is on right now */
+    const openNow = sh.events.filter(e => e.kind === 'consult' && e.pending)
+      .sort((a, b) => (b.stat ? 1 : 0) - (a.stat ? 1 : 0) || a.started - b.started);
+    html += `<div class="section-label">On now${openNow.length ? ' — ' + openNow.length : ''}</div>`;
+    if (openNow.length) {
+      html += openNow.map(e => openConsultCard(e, true)).join('');
+      html += `<div class="btn-row" style="margin-top:2px">
+        <button class="btn btn-ghost btn-sm" data-act="goConsults" style="flex:1">All consults</button>
+        <button class="btn btn-ghost btn-sm" data-act="newConsult" style="flex:1">${I.plus} Start another</button>
+      </div>`;
+    } else {
+      html += `<button class="assign-empty" data-act="newConsult">
+        <span>${I.plus}</span>
+        <div><b>Nothing open</b><span>Start a consult with its room and it shows here</span></div>
+      </button>`;
+    }
+
+    /* the rooms still to check */
     const rs = roundStats();
+    const toCheck = (S.rounds || []).filter(x => x.status !== 'done');
     if (rs.total) {
-      html += `<button class="list-row" data-act="goRounds" style="margin-top:12px">
-        <div class="grow"><b>Check list — ${rs.done} of ${rs.total}</b><span>${rs.left ? rs.left + ' room' + (rs.left === 1 ? '' : 's') + ' left' : 'list complete'}</span></div>${I.chev}</button>`;
+      html += `<div class="section-label">Rooms to check — ${rs.done} of ${rs.total}</div>`;
+      if (toCheck.length) {
+        const pct = rs.total ? Math.round((rs.done / rs.total) * 100) : 0;
+        html += `<div class="meter-track" style="margin-bottom:11px"><div class="meter-fill ${pct === 100 ? 'good' : ''}" style="width:${pct}%"></div></div>`;
+        html += `<div class="todo-grid">` + toCheck.slice(0, 8).map(it => {
+          const dev = VW.opts.devices.find(d => d.id === it.device);
+          return `<div class="todo-room">
+            <button class="tr-head" data-act="goRounds">
+              <span class="tr-no">${esc(it.room)}</span>
+              <span class="tr-dev">${esc(dev ? dev.label : 'tap to set')}</span>
+              ${it.due === 'change' ? '<span class="badge badge-gold tr-badge">change due</span>' : ''}
+            </button>
+            <div class="tr-act">
+              <button class="btn btn-sm btn-primary" data-act="doneRound" data-id="${it.id}">Checked</button>
+              <button class="btn btn-sm btn-gold" data-act="changedRound" data-id="${it.id}">Changed</button>
+            </div>
+          </div>`;
+        }).join('') + `</div>`;
+        if (toCheck.length > 8) {
+          html += `<button class="btn btn-ghost btn-block btn-sm" data-act="goRounds" style="margin-top:9px">
+            ${toCheck.length - 8} more on the list</button>`;
+        }
+      } else {
+        html += `<div class="empty"><b>List clear</b>All ${rs.total} rooms done${rs.changed ? ', ' + rs.changed + ' dressing' + (rs.changed === 1 ? '' : 's') + ' changed' : ''}.</div>`;
+      }
+    } else {
+      html += `<div class="section-label">Rooms to check</div>
+        <button class="assign-empty" data-act="pasteRounds">
+          <span>${I.plus}</span>
+          <div><b>No list yet</b><span>Paste the rooms you were handed at the start of the shift</span></div>
+        </button>`;
     }
 
     /* productivity */
@@ -4596,7 +4715,10 @@ VW.consult.tipLocations = ['SVC', 'Cavo-atrial junction', 'Right atrium (fluoro-
     } else {
       toast(changed ? 'Marked changed' : 'Marked checked — clock in to log it');
     }
-    save(true); render();
+    save(true);
+    /* the card that just opened carries the exposed and circumference
+       fields, so make sure he is looking at it */
+    if (active !== 'checks') go('checks'); else render();
   }
 
   function undoRound(id) {
@@ -4726,7 +4848,8 @@ VW.consult.tipLocations = ['SVC', 'Cavo-atrial junction', 'Right atrium (fluoro-
   function viewConsults() {
     const sh = cur();
     const all = sh ? sh.events.filter(e => e.kind === 'consult') : [];
-    const open = all.filter(e => e.pending).sort((a, b) => a.started - b.started);
+    const open = all.filter(e => e.pending)
+      .sort((a, b) => (b.stat ? 1 : 0) - (a.stat ? 1 : 0) || a.started - b.started);
     const list = all.filter(e => !e.pending).sort((a, b) => b.at - a.at);
     const c = sh ? counts(sh) : { consults: 0, stats: 0, unsuccessful: 0 };
     let html = `<h1 class="view-title">Consults</h1>
@@ -4761,26 +4884,46 @@ VW.consult.tipLocations = ['SVC', 'Cavo-atrial junction', 'Right atrium (fluoro-
   }
 
   /* an open consult: the type is banked, the clock is running, details come after the tick */
-  function openConsultCard(ev) {
+  function openConsultCard(ev, compact) {
     const t = VW.consult.types.find(x => x.id === ev.ctype);
     const mins = Math.max(0, Math.round((Date.now() - (ev.started || ev.at)) / 60000));
-    return `<div class="open-consult${ev.stat ? ' is-stat' : ''}" data-open-consult="${ev.id}">
+    const since = `${fmtClock(ev.started || ev.at)}${mins ? ' · ' + mins + ' min' : ' · just now'}`;
+    return `<div class="open-consult${ev.stat ? ' is-stat' : ''}${compact ? ' is-compact' : ''}" data-open-consult="${ev.id}">
       <div class="oc-top">
         <span class="oc-ico">${I[(t && t.icon) || 'consult'] || I.consult}</span>
         <div class="grow" style="min-width:0">
-          <div class="oc-name">${esc(t ? t.label : 'Consult')}${ev.stat ? ' <span class="badge badge-stat">STAT</span>' : ''}</div>
-          <div class="oc-since">Started ${fmtClock(ev.started || ev.at)}${mins ? ' · ' + mins + ' min ago' : ' · just now'}</div>
+          <div class="oc-name">${ev.room ? esc(ev.room) : '<span class="oc-noroom">No room</span>'}${ev.stat ? ' <span class="badge badge-stat">STAT</span>' : ''}</div>
+          <div class="oc-since">${esc(t ? t.label : 'Consult')} · ${since}</div>
         </div>
       </div>
       <button class="oc-done" data-act="finishConsult" data-id="${ev.id}">
         <span class="oc-box">${I.ok}</span>
         <span>Done — stamp the time</span>
       </button>
-      <div class="oc-drop">
+      ${compact
+        ? (ev.room ? '' : `<div class="oc-drop"><button data-act="editOpenRoom" data-id="${ev.id}">Add room</button></div>`)
+        : `<div class="oc-drop">
+        <button data-act="editOpenRoom" data-id="${ev.id}">${ev.room ? 'Change room' : 'Add room'}</button>
         <button data-act="toggleOpenStat" data-id="${ev.id}">${ev.stat ? 'Not STAT' : 'Mark STAT'}</button>
         <button data-act="dropConsult" data-id="${ev.id}">Discard</button>
-      </div>
+      </div>`}
     </div>`;
+  }
+
+  function editOpenRoom(id) {
+    const sh = cur(); if (!sh) return;
+    const ev = sh.events.find(x => x.id === id); if (!ev) return;
+    openSheet({
+      title: 'Room',
+      body: `<div class="field"><label for="orRoom">Room / unit</label>
+        <input type="text" id="orRoom" value="${esc(ev.room || '')}" placeholder="e.g. 4W-12" autocapitalize="characters"></div>`,
+      confirm: 'Save',
+      onConfirm: () => {
+        const root = $('.sheet', sheetStack[sheetStack.length - 1]);
+        ev.room = (($('#orRoom', root) || {}).value || '').trim();
+        save(true); render();
+      }
+    });
   }
 
   /* ---------------- Terms tab: the medical dictionary ---------------- */
@@ -6029,6 +6172,7 @@ ICU-3 CVC dressing change
       case 'break': toggleBreak(); break;
       case 'newConsult': if (requireShift()) openConsult(); break;
       case 'finishConsult': finishConsult(id); break;
+      case 'editOpenRoom': editOpenRoom(id); break;
       case 'dropConsult': dropConsult(id); break;
       case 'toggleOpenStat': {
         const sh = cur(); if (!sh) break;
