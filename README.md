@@ -72,6 +72,27 @@ IndexedDB, not in the backup JSON, so re-attach them if you move to a new phone.
 
 Because these are internal Lee Health documents, keep the repository private.
 
+## The shift grade
+
+Every consult is timed from **Start consult** to the moment you tick it off. Each one is measured
+against a target for that kind of work, not against a single clock: a PICC gets 55 minutes, a PIV
+gets 12, a dressing change gets 12 whatever device it is on. An unsuccessful attempt adds 10 minutes
+to the target, a second RN assessment adds 5, tPA adds 30 per dose.
+
+**Faster is never scored higher than on target.** A difficult access done carefully in 25 minutes is
+better nursing than a rushed one in 8, and nothing here says otherwise.
+
+The shift score is 100 points: 45 for consults against your own range, 20 for checks, 20 for pace,
+15 for documentation you could still act on next week. S is 95+, then A, B, C, D and F below 55.
+Under two hours worked it does not grade at all.
+
+Anything on a clinical hold stays out of the pace score entirely — tPA dwell, waiting on an x-ray,
+or anything you tick as clinically driven on the consult form. Time you did not control is not
+your pace.
+
+This is yours. No one else sees it, and it is not a reason to give a patient less time than the
+work needs.
+
 ## Reminders, honestly
 
 Android will fire the hydrate-and-break reminder while Veinwise is open or in the background.
