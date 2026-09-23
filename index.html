@@ -1,18 +1,15 @@
 <!doctype html>
-<html lang="en">
-<head>
+<html lang="en"><head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=5">
-<meta name="theme-color" content="#061821" media="(prefers-color-scheme: dark)">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#EEF4F9" media="(prefers-color-scheme: light)">
-<meta name="description" content="Veinwise — clinical decision support for vascular access nurses. Right access, safer care, better outcomes.">
+<meta name="theme-color" content="#061821" media="(prefers-color-scheme: dark)">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="Veinwise">
 <link rel="manifest" href="manifest.webmanifest">
-<link rel="apple-touch-icon" href="icon-192.png">
 <link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<style>[hidden]:not([hidden=until-found i]){display:none!important}</style>
 <title>Veinwise</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -1191,6 +1188,70 @@ pre.sample{
 }
 .gb-detail{font-size:12px;color:var(--ink-3);margin-top:5px;line-height:1.4;}
 
+
+/* ---------------- shift report (print / Save as PDF) ---------------- */
+#vwPrint{display:none;}
+.vr{--vr-ink:#15232D;--vr-ink2:#4A5B67;--vr-ink3:#7C8B96;--vr-blue:#0B3550;--vr-gold:#A98B3C;
+  --vr-rule:#D5DEE6;--vr-wash:#F2F6F9;--vr-good:#2F6B4A;--vr-warn:#9A6F12;--vr-bad:#A8452C;
+  color:var(--vr-ink);background:#fff;font-family:var(--font-ui, 'Work Sans', system-ui, sans-serif);
+  font-size:9.6pt;line-height:1.42;font-variant-numeric:tabular-nums;}
+.vr *{box-sizing:border-box;}
+.vr-head{display:flex;align-items:flex-end;justify-content:space-between;gap:20px;
+  padding-bottom:10px;border-bottom:2.4pt solid var(--vr-gold);}
+.vr-brand{display:flex;align-items:center;gap:8px;}
+.vr-brand .brand-mark{width:34px;height:35px;}
+.vr-brand .brand-word{width:118px;height:24px;}
+.vr-title{text-align:right;}
+.vr-title h1{font-family:'Fraunces',Georgia,serif;font-weight:600;font-size:21pt;line-height:1.05;margin:0;color:var(--vr-blue);}
+.vr-title p{margin:3px 0 0;color:var(--vr-ink2);font-size:9.4pt;}
+.vr-top{display:grid;grid-template-columns:auto 1fr;gap:18px;align-items:center;margin:16px 0 12px;}
+.vr-letter{font-family:'Fraunces',Georgia,serif;font-weight:600;font-size:58pt;line-height:.9;
+  color:var(--vr-blue);min-width:62px;text-align:center;}
+.vr-letter.is-none{color:var(--vr-ink3);font-size:40pt;}
+.vr-verdict b{display:block;font-size:13pt;color:var(--vr-blue);}
+.vr-verdict p{margin:3px 0 0;color:var(--vr-ink2);max-width:62ch;}
+.vr-hours{margin-top:6px;color:var(--vr-ink);font-weight:500;}
+.vr-strip{display:grid;grid-template-columns:repeat(6,1fr);border:1px solid var(--vr-rule);border-radius:6px;overflow:hidden;margin-bottom:14px;}
+.vr-strip div{padding:7px 9px;border-left:1px solid var(--vr-rule);}
+.vr-strip div:first-child{border-left:0;}
+.vr-strip b{display:block;font-size:15pt;font-weight:600;color:var(--vr-blue);line-height:1.1;}
+.vr-strip span{font-size:8.2pt;color:var(--vr-ink2);}
+.vr h2{font-family:'Fraunces',Georgia,serif;font-weight:600;font-size:12.5pt;color:var(--vr-blue);
+  margin:16px 0 6px;padding-bottom:3px;border-bottom:1px solid var(--vr-rule);display:flex;justify-content:space-between;align-items:baseline;break-after:avoid;page-break-after:avoid;}
+.vr h2 small{font-family:'Work Sans',system-ui,sans-serif;font-weight:500;font-size:8.6pt;color:var(--vr-ink3);}
+.vr table{width:100%;border-collapse:collapse;}
+.vr th{text-align:left;font-weight:600;font-size:8.2pt;color:var(--vr-ink2);padding:4px 6px;background:var(--vr-wash);}
+.vr td{padding:5px 6px;border-bottom:1px solid var(--vr-rule);vertical-align:top;}
+.vr tr{break-inside:avoid;page-break-inside:avoid;}
+.vr td.t{white-space:nowrap;width:1%;}
+.vr td.r{font-weight:600;white-space:nowrap;width:1%;}
+.vr .vr-sub{display:block;color:var(--vr-ink2);font-size:8.6pt;margin-top:1px;}
+.vr .vr-tag{display:inline-block;font-size:7.6pt;font-weight:600;padding:0 5px;border-radius:3px;margin-left:4px;
+  border:1px solid currentColor;line-height:1.45;vertical-align:1px;}
+.vr .tag-stat{color:var(--vr-bad);}
+.vr .tag-flag{color:var(--vr-bad);}
+.vr .vp{font-weight:600;}
+.vr .vp-quick,.vr .vp-ontarget{color:var(--vr-good);}
+.vr .vp-long{color:var(--vr-warn);}
+.vr .vp-over{color:var(--vr-bad);}
+.vr .vp-held{color:var(--vr-ink3);font-weight:500;}
+.vr-parts td:first-child{width:150px;}
+.vr-parts td:nth-child(2){width:70px;white-space:nowrap;font-weight:600;}
+.vr-bar{height:5px;background:var(--vr-wash);border-radius:3px;overflow:hidden;width:110px;margin-top:4px;}
+.vr-bar i{display:block;height:100%;background:var(--vr-blue);}
+.vr-note{border-left:2.4pt solid var(--vr-gold);padding:4px 0 4px 10px;margin:6px 0;white-space:pre-wrap;break-inside:avoid;}
+.vr-note time{display:block;font-size:8.2pt;color:var(--vr-ink3);}
+.vr-empty{color:var(--vr-ink3);font-style:italic;margin:4px 0;}
+.vr-foot{margin-top:20px;padding-top:7px;border-top:1px solid var(--vr-rule);display:flex;justify-content:space-between;gap:16px;
+  font-size:7.8pt;color:var(--vr-ink3);}
+@media print{
+  @page{size:letter;margin:13mm 14mm;}
+  :root,html,body{height:auto!important;min-height:0!important;overflow:visible!important;padding:0!important;background:#fff!important;}
+  body{display:block!important;}
+  body > *:not(#vwPrint){display:none!important;}
+  #vwPrint{display:block!important;}
+  .vr, .vr *{-webkit-print-color-adjust:exact;print-color-adjust:exact;}
+}
 </style>
 </head>
 <body>
@@ -1229,7 +1290,7 @@ VW.opts = {
     { id: 'other',    label: 'Other' }
   ],
   gauges: ['18', '20', '22', '24'],
-  lengths: ['1.0', '1.1', '1.18', '1.88'],
+  lengths: ['0.56', '0.75', '0.9', '1.0', '1.1', '1.16', '1.25', '1.3', '1.75', '1.88', '2.26'],
   dressings: ['3M Tegaderm', 'SorbaView', 'IV3000'],
   sides: ['L', 'R'],
   sites: ['Hand', 'Forearm', 'Upper arm', 'AC fossa', 'Wrist', 'Basilic', 'Cephalic', 'Brachial', 'EJ', 'Foot', 'Other'],
@@ -3519,7 +3580,7 @@ VW.grade.shift = function (sh, settings, helpers) {
   const H = helpers || {};
   const worked = H.workedMs ? H.workedMs(sh) : 0;
   const hours = worked / 3600000;
-  const shiftHours = st.shiftHours || 12;
+  const shiftHours = st.shiftHours || 12.5;
   const frac = Math.max(0, Math.min(1, hours / shiftHours));
 
   const evs = (sh.events || []).filter(e => !e.pending);
@@ -3759,7 +3820,7 @@ VW.consult.tipLocations = ['SVC', 'Cavo-atrial junction', 'Right atrium (fluoro-
     v: 1,
     profile: { name: '', facility: '' },
     settings: {
-      shiftHours: 12, consultMin: 17, consultMax: 22, checkMin: 5, checkMax: 10,
+      shiftHours: 12.5, consultMin: 17, consultMax: 22, checkMin: 5, checkMax: 10,
       reminderMins: 180, breakMins: 15, notify: false, theme: 'auto',
       intro: 'daily', introSeen: '', preShiftMins: 60
     },
@@ -3781,6 +3842,7 @@ VW.consult.tipLocations = ['SVC', 'Cavo-atrial junction', 'Right atrium (fluoro-
       s.settings = Object.assign(structuredClone(DEFAULTS.settings), p.settings || {});
       s.profile = Object.assign({}, DEFAULTS.profile, p.profile || {});
       s.lib = Object.assign(structuredClone(DEFAULTS.lib), p.lib || {});
+      if (!s.settings.shiftDefV2) { if (Number(s.settings.shiftHours) === 12) s.settings.shiftHours = 12.5; s.settings.shiftDefV2 = true; }
       if (!Array.isArray(s.rounds)) s.rounds = [];
       return s;
     } catch (e) { console.warn('load failed', e); return structuredClone(DEFAULTS); }
@@ -3845,7 +3907,7 @@ VW.consult.tipLocations = ['SVC', 'Cavo-atrial junction', 'Right atrium (fluoro-
       checks: e.filter(x => x.kind === 'check').length,
       mets: e.filter(x => x.kind === 'met').length,
       stats: e.filter(x => x.kind === 'consult' && x.stat && !x.pending).length,
-      unsuccessful: e.filter(x => x.kind === 'consult' && x.piv && x.piv.unsuccessful).length
+      unsuccessful: e.filter(x => x.kind === 'consult' && !x.pending && (x.access || x.piv || {}).unsuccessful).length
     };
   }
   function stats(sh) {
@@ -3973,17 +4035,22 @@ VW.consult.tipLocations = ['SVC', 'Cavo-atrial junction', 'Right atrium (fluoro-
           <b>${counts(sh).consults}</b> consults · <b>${counts(sh).checks}</b> checks · <b>${counts(sh).mets}</b> MET/code<br>
           <span class="muted">${fmtDur(workedMs(sh))} worked${breakMs(sh) > 60000 ? ' · ' + fmtDur(breakMs(sh)) + ' break' : ''}</span>
         </div>
+        <label class="check" style="margin-top:12px" data-on="${S.settings.pdfOnOut !== false}"><input type="checkbox" id="pdfOnOut" ${S.settings.pdfOnOut !== false ? 'checked' : ''}> Save a PDF of this shift</label>
         ${(S.rounds || []).length ? `<label class="check" style="margin-top:12px" data-on="true"><input type="checkbox" id="clearRoundsOnOut" checked> Clear the Rounds list (${roundStats().done} of ${roundStats().total} done)</label>` : ''}`,
       confirm: 'Save & clock out',
       onConfirm: () => {
         sh.summary = ($('#endSummary') || {}).value || '';
         const clearR = ($('#clearRoundsOnOut') || {}).checked;
+        const pdfBox = $('#pdfOnOut');
+        const wantPdf = pdfBox ? pdfBox.checked : false;
+        S.settings.pdfOnOut = wantPdf;
         (sh.breaks || []).forEach(b => { if (!b.end) b.end = Date.now(); });
         sh.clockOut = Date.now();
         sh.rounds = (S.rounds || []).map(x => Object.assign({}, x));
         S.shifts.unshift(sh); S.current = null;
         if (clearR) S.rounds = [];
         save(true); toast('Shift saved to History'); render();
+        if (wantPdf) setTimeout(() => printShift(sh), 350);
       }
     });
   }
@@ -6216,8 +6283,8 @@ ICU-3 CVC dressing change
         <div class="field"><label class="field-label">Type</label>
           ${chipGroup('mSchType', [{ v: 'Day shift', l: 'Day' }, { v: 'Night shift', l: 'Night' }, { v: 'Call', l: 'Call' }, { v: 'PTO', l: 'PTO' }], 'Day shift', false)}</div>
         <div class="inline-2">
-          <div class="field"><label for="mSchStart">Start</label><input type="time" id="mSchStart" value="07:00"></div>
-          <div class="field"><label for="mSchEnd">End</label><input type="time" id="mSchEnd" value="19:00"></div>
+          <div class="field"><label for="mSchStart">Start</label><input type="time" id="mSchStart" value="11:00"></div>
+          <div class="field"><label for="mSchEnd">End</label><input type="time" id="mSchEnd" value="23:30"></div>
         </div>
         <div class="field"><label for="mSchFac">Facility</label>
           <input type="text" id="mSchFac" value="${esc(S.profile.facility || '')}" placeholder="Campus / hospital"></div>
@@ -6231,7 +6298,7 @@ ICU-3 CVC dressing change
           const st = $('#mSchStart', back), en = $('#mSchEnd', back);
           if (!st || !en) return;
           if (v === 'Night shift') { st.value = '19:00'; en.value = '07:00'; }
-          else if (v === 'Day shift') { st.value = '07:00'; en.value = '19:00'; }
+          else if (v === 'Day shift') { st.value = '11:00'; en.value = '23:30'; }
         }, 0));
       },
       onConfirm: () => {
@@ -6280,6 +6347,7 @@ ICU-3 CVC dressing change
     openSheet({
       title: fmtDate(sh.date),
       body: `
+        <button class="btn btn-primary btn-block" data-act="shiftPdf" data-id="${sh.id}" style="margin-bottom:12px">Save as PDF</button>
         <div class="counters" style="margin-top:0">
           <div class="counter"><b>${c.consults}</b><span>Consults</span></div>
           <div class="counter"><b>${c.checks}</b><span>Checks</span></div>
@@ -6325,6 +6393,115 @@ ICU-3 CVC dressing change
     if (sh.summary) { lines.push('', 'HAND-OFF', sh.summary); }
     return lines.join('\n');
   }
+
+  /* ---------------- shift report: Save as PDF ----------------
+     Uses the phone's own print dialog (Save as PDF), so it adds no library,
+     works offline and never writes to the shift. Read-only by design. */
+  function findShift(id) {
+    return S.shifts.find(x => x.id === id) || (S.current && S.current.id === id ? S.current : null);
+  }
+  function devLabel(id) { const d = VW.opts.devices.find(x => x.id === id); return d ? d.label : ''; }
+  function shiftReport(sh) {
+    const c = counts(sh), g = gradeOf(sh);
+    const evs = sh.events.filter(x => !x.pending).sort((a, b) => a.at - b.at);
+    const consults = evs.filter(e => e.kind === 'consult');
+    const checks = evs.filter(e => e.kind === 'check');
+    const mets = evs.filter(e => e.kind === 'met');
+    const unsucc = consults.filter(e => (e.access || e.piv || {}).unsuccessful).length;
+    const who = [S.profile.name, S.profile.facility].filter(Boolean).map(esc).join(', ');
+    const brk = breakMs(sh);
+    const hours = `${fmtClock(sh.clockIn)} to ${sh.clockOut ? fmtClock(sh.clockOut) : 'still open'}, ${fmtDur(workedMs(sh))} worked${brk > 60000 ? ', ' + fmtDur(brk) + ' on break' : ''}`;
+    const ctype = e => { const t = VW.consult.types.find(x => x.id === e.ctype); return t ? t.label : 'Consult'; };
+    const consultRows = consults.map(e => {
+      const pg = VW.grade.consult(e);
+      const d = devLabel(e.device);
+      let what = ctype(e);
+      if (e.ctype === 'deaccess' && e.deaccess) what = e.deaccess.mode === 'deaccess' ? 'De-access' : 'Access port';
+      const detail = eventDetail(Object.assign({}, e, { room: '' }));
+      const pace = pg.band ? `<span class="vp vp-${pg.band}">${esc(VW.grade.bandLabel[pg.band])}</span>`
+        : (pg.excused === 'clinically driven' || pg.excused === 'waiting on x-ray') ? `<span class="vp vp-held">${esc(pg.excused)}</span>` : '';
+      return `<tr>
+        <td class="t">${e.started ? fmtClock(e.started) + '<span class="vr-sub">to ' + fmtClock(e.at) + '</span>' : fmtClock(e.at)}</td>
+        <td class="r">${esc(e.room || '')}</td>
+        <td><b>${esc(what)}</b>${d ? ', ' + esc(d) : ''}${e.stat ? '<span class="vr-tag tag-stat">STAT</span>' : ''}${e.flag ? '<span class="vr-tag tag-flag">Avoid</span>' : ''}
+          ${detail ? `<span class="vr-sub">${esc(detail)}</span>` : ''}</td>
+        <td class="t">${pg.mins != null ? fmtMins(pg.mins) : ''}${pg.target ? `<span class="vr-sub">target ${pg.target} min</span>` : ''}</td>
+        <td class="t">${pace}</td></tr>`;
+    }).join('');
+    const checkRows = checks.map(e => {
+      const bits = [];
+      if (e.exposure) bits.push('exp ' + e.exposure + ' cm');
+      if (e.circ) bits.push('circ ' + e.circ + ' cm');
+      if (e.intact) bits.push('dressing intact');
+      if (e.bloodReturn) bits.push('blood return');
+      if (e.flushed) bits.push('flushed');
+      if (e.securement) bits.push('securement intact');
+      if (e.chg) bits.push('CHG');
+      if (e.clean) bits.push('clean and dry');
+      if (e.note) bits.push(e.note);
+      return `<tr><td class="t">${fmtClock(e.at)}</td><td class="r">${esc(e.room || '')}</td>
+        <td><b>${e.changed ? 'Dressing changed' : 'Checked'}</b>${devLabel(e.device) ? ', ' + esc(devLabel(e.device)) : ''}${e.fromRounds ? '<span class="vr-sub">from rounds list</span>' : ''}</td>
+        <td>${esc(bits.join(', '))}</td></tr>`;
+    }).join('');
+    const metRows = mets.map(e => `<tr><td class="t">${fmtClock(e.at)}</td><td class="r">${esc(e.room || '')}</td>
+      <td><b>${esc(e.mtype || 'MET / code')}</b>${e.access ? `<span class="vr-sub">${esc(e.access)}</span>` : ''}</td><td>${esc(e.note || '')}</td></tr>`).join('');
+    const rounds = sh.rounds || [];
+    const rDone = rounds.filter(r => r.status === 'done').length;
+    const roundRows = rounds.map(r => `<tr><td class="r">${esc(r.room)}</td><td>${esc(devLabel(r.device) || '')}${r.due === 'change' ? '<span class="vr-tag">change due</span>' : ''}${r.note ? `<span class="vr-sub">${esc(r.note)}</span>` : ''}</td>
+      <td class="t">${r.status === 'done' ? (r.changed ? 'Changed ' : 'Checked ') + fmtClock(r.at) : '<span class="vp vp-over">Not done</span>'}</td></tr>`).join('');
+    const partRows = g.letter ? g.parts.map(pt => {
+      const pct = Math.max(0, Math.min(100, Math.round(pt.got / pt.max * 100)));
+      return `<tr><td><b>${esc(pt.label)}</b><div class="vr-bar"><i style="width:${pct}%"></i></div></td><td>${pt.got} / ${pt.max}</td><td>${esc(pt.detail)}</td></tr>`;
+    }).join('') : '';
+    return `<article class="vr">
+      <header class="vr-head">
+        <div class="vr-brand">${BRAND}</div>
+        <div class="vr-title"><h1>Shift report</h1><p>${esc(fmtDateLong(sh.date))}${who ? '<br>' + who : ''}</p></div>
+      </header>
+      <section class="vr-top">
+        <div class="vr-letter ${g.letter ? '' : 'is-none'}">${g.letter || '\u2013'}</div>
+        <div class="vr-verdict">
+          <b>${g.letter ? esc(VW.grade.letterName[g.letter]) + ', ' + g.score + ' of 100' : 'Not graded'}</b>
+          <p>${esc((g.note || '').replace(/^./, ch => ch.toUpperCase()))}</p>
+          <div class="vr-hours">${esc(hours)}</div>
+        </div>
+      </section>
+      <div class="vr-strip">
+        <div><b>${c.consults}</b><span>Consults</span></div>
+        <div><b>${c.checks}</b><span>Checks</span></div>
+        <div><b>${c.mets}</b><span>MET / code</span></div>
+        <div><b>${c.stats}</b><span>STAT</span></div>
+        <div><b>${unsucc}</b><span>Unsuccessful</span></div>
+        <div><b>${g.median != null ? fmtMins(g.median) : '\u2013'}</b><span>Median consult</span></div>
+      </div>
+      ${g.letter ? `<h2>How the grade breaks down</h2><table class="vr-parts"><tbody>${partRows}</tbody></table>` : ''}
+      <h2>Consults <small>${consults.length}</small></h2>
+      ${consults.length ? `<table><thead><tr><th>Time</th><th>Room</th><th>Consult</th><th>Took</th><th>Pace</th></tr></thead><tbody>${consultRows}</tbody></table>` : '<p class="vr-empty">No consults logged.</p>'}
+      <h2>Checks <small>${checks.length}</small></h2>
+      ${checks.length ? `<table><thead><tr><th>Time</th><th>Room</th><th>Check</th><th>Findings</th></tr></thead><tbody>${checkRows}</tbody></table>` : '<p class="vr-empty">No checks logged.</p>'}
+      ${mets.length ? `<h2>MET / code <small>${mets.length}</small></h2><table><thead><tr><th>Time</th><th>Room</th><th>Call</th><th>Note</th></tr></thead><tbody>${metRows}</tbody></table>` : ''}
+      ${rounds.length ? `<h2>Rounds list <small>${rDone} of ${rounds.length} done</small></h2><table><thead><tr><th>Room</th><th>Line</th><th>Status</th></tr></thead><tbody>${roundRows}</tbody></table>` : ''}
+      ${(sh.notes || []).length ? `<h2>Shift notes</h2>` + sh.notes.map(n => `<div class="vr-note"><time>${fmtClock(n.at)}</time>${esc(n.text)}</div>`).join('') : ''}
+      ${sh.summary ? `<h2>Hand-off</h2><div class="vr-note">${esc(sh.summary)}</div>` : ''}
+      <footer class="vr-foot"><span>Personal record. Room numbers only, no patient identifiers.</span><span>Made ${esc(new Date().toLocaleString())} with Veinwise, Aeterna Atelier</span></footer>
+    </article>`;
+  }
+  function printShift(sh) {
+    if (!sh) return;
+    let root = $('#vwPrint');
+    if (!root) { root = document.createElement('div'); root.id = 'vwPrint'; document.body.appendChild(root); }
+    root.innerHTML = shiftReport(sh);
+    const prev = document.title;
+    document.title = 'Veinwise shift ' + sh.date;
+    const restore = () => { document.title = prev; window.removeEventListener('afterprint', restore); };
+    window.addEventListener('afterprint', restore);
+    setTimeout(restore, 60000);
+    const ready = (document.fonts && document.fonts.ready) ? document.fonts.ready : Promise.resolve();
+    ready.then(() => setTimeout(() => {
+      try { window.print(); }
+      catch (e) { toast('Printing is blocked here. Open Veinwise from your home screen and try again.'); }
+    }, 80));
+  }
   function copyText(t) {
     try {
       navigator.clipboard.writeText(t).then(() => toast('Copied to clipboard'), () => fallbackCopy(t));
@@ -6357,7 +6534,7 @@ ICU-3 CVC dressing change
       <div class="card">
         <div class="section-label" style="margin-top:0">Shift targets</div>
         <div class="inline-2">
-          <div class="field"><label for="setHours">Shift length (h)</label><input type="number" id="setHours" data-set="settings.shiftHours" value="${s.shiftHours}" min="1" max="24"></div>
+          <div class="field"><label for="setHours">Shift length (h)</label><input type="number" id="setHours" data-set="settings.shiftHours" value="${s.shiftHours}" min="1" max="24" step="0.5"></div>
           <div class="field"><label for="setRem">Reminder every (min)</label><input type="number" id="setRem" data-set="settings.reminderMins" value="${s.reminderMins}" min="15" step="15"></div>
         </div>
         <div class="inline-2">
@@ -6825,6 +7002,7 @@ ICU-3 CVC dressing change
       case 'goGuidesDressings': sub.checks = 'home'; sub.guides = 'dressings'; go('guides'); break;
       case 'dayNight': toggleDayNight(); break;
       case 'gradeScale': openGradeScale(); break;
+      case 'shiftPdf': printShift(findShift(id)); break;
       case 'calMulti': calMulti = !calMulti; if (!calMulti) calSel = []; render(); break;
       case 'calSelClear': calSel = []; render(); break;
       case 'calSelApply': applySelectedDays(); break;
@@ -6909,8 +7087,8 @@ ICU-3 CVC dressing change
         <div class="field"><label class="field-label">Type</label>
           ${chipGroup('schType', [{ v: 'Day shift', l: 'Day' }, { v: 'Night shift', l: 'Night' }, { v: 'Call', l: 'Call' }, { v: 'PTO', l: 'PTO' }], 'Day shift', false)}</div>
         <div class="inline-2">
-          <div class="field"><label for="schStart">Start</label><input type="time" id="schStart" value="07:00"></div>
-          <div class="field"><label for="schEnd">End</label><input type="time" id="schEnd" value="19:00"></div>
+          <div class="field"><label for="schStart">Start</label><input type="time" id="schStart" value="11:00"></div>
+          <div class="field"><label for="schEnd">End</label><input type="time" id="schEnd" value="23:30"></div>
         </div>
         <div class="field"><label for="schFac">Facility</label><input type="text" id="schFac" value="${esc(S.profile.facility || '')}" placeholder="Campus / hospital"></div>
         <div class="field"><label for="schNote">Note</label><input type="text" id="schNote" placeholder="Optional"></div>`,
@@ -6922,7 +7100,7 @@ ICU-3 CVC dressing change
           const st = $('#schStart', back), en = $('#schEnd', back);
           if (!st || !en) return;
           if (v === 'Night shift') { st.value = '19:00'; en.value = '07:00'; }
-          else if (v === 'Day shift') { st.value = '07:00'; en.value = '19:00'; }
+          else if (v === 'Day shift') { st.value = '11:00'; en.value = '23:30'; }
         }, 0));
       },
       onConfirm: () => {
@@ -7112,5 +7290,5 @@ ICU-3 CVC dressing change
 })();
 
 </script>
-</body>
-</html>
+
+</body></html>
