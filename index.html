@@ -4575,8 +4575,8 @@ VW.consult.tipLocations = ['SVC', 'Cavo-atrial junction', 'Right atrium (fluoro-
         `<button class="hub-card ${t.tone}" data-ctype="${t.id}" aria-pressed="false">
           <span class="hub-ico">${I[t.icon] || I.plus}</span>
           <b>${esc(t.label)}</b><span>${esc(t.hint)}</span></button>`).join('') + `</div>
-        <div class="help" style="margin-top:12px">Start it and the clock runs. Tick it off when you finish and Veinwise stamps the time, works out how long it took, and asks for the details.</div>`,
-      confirm: 'Start consult',
+        <div class="help" style="margin-top:12px">Assign it — the clock stays off until you are walking into the room. Tick it off when you finish and Veinwise stamps the time, works out how long it took, and asks for the details.</div>`,
+      confirm: 'Assign consult',
       onOpen: back => {
         const go = $('.sheet-foot .btn-primary', back);
         if (go) { go.disabled = true; go.textContent = 'Pick a type'; }
@@ -4587,7 +4587,7 @@ VW.consult.tipLocations = ['SVC', 'Cavo-atrial junction', 'Right atrium (fluoro-
         $$('[data-ctype]', back).forEach(card => card.addEventListener('click', () => {
           $$('[data-ctype]', back).forEach(x => x.setAttribute('aria-pressed', 'false'));
           card.setAttribute('aria-pressed', 'true');
-          if (go) { go.disabled = false; go.textContent = 'Start consult'; }
+          if (go) { go.disabled = false; go.textContent = 'Assign consult'; }
         }));
       },
       onConfirm: () => {
@@ -4602,19 +4602,30 @@ VW.consult.tipLocations = ['SVC', 'Cavo-atrial junction', 'Right atrium (fluoro-
     });
   }
 
-  /* an open consult is a real event, just not filled in yet */
+  /* an assigned consult is a real event, just not timed yet —
+     the clock only starts when he walks into the room */
   function startConsult(type, room, stat) {
     const sh = S.current; if (!sh) return;
     const now = Date.now();
     sh.events.push({
       id: uid(), kind: 'consult', ctype: type, pending: true,
-      started: now, at: now, stat: !!stat, room: room || ''
+      assignedAt: now, started: null, at: now, stat: !!stat, room: room || ''
     });
     sh.events.sort((a, b) => a.at - b.at);
     save(true);
     const t = VW.consult.types.find(x => x.id === type);
-    toast((room ? room + ' · ' : '') + (t ? t.label : 'Consult') + ' started');
+    toast((room ? room + ' · ' : '') + (t ? t.label : 'Consult') + ' assigned');
     render();
+  }
+
+  /* walking into the room: the clock starts */
+  function enterRoom(id) {
+    const sh = S.current; if (!sh) return;
+    const ev = sh.events.find(x => x.id === id);
+    if (!ev || ev.started) return;
+    ev.started = Date.now();
+    save(true); render();
+    toast('In the room — clock running');
   }
 
   /* the tick: stamp the finish time, then let the details out */
@@ -4873,6 +4884,8 @@ VW.consult.tipLocations = ['SVC', 'Cavo-atrial junction', 'Right atrium (fluoro-
     if (ev.kind === 'consult') {
       const a = ev.access, t = ev.trouble, c = ev.clearing, d = ev.deaccess, dr = ev.dressing, ed = ev.education;
       if (ev.canceled) bits.push('consult canceled');
+      if (ev.assignedAt && ev.started && ev.started - ev.assignedAt >= 60000)
+        bits.push('assigned ' + fmtClock(ev.assignedAt));
       if (a) {
         const seg = [];
         if (a.gauge) seg.push(a.gauge + ' G');
@@ -5070,7 +5083,7 @@ VW.consult.tipLocations = ['SVC', 'Cavo-atrial junction', 'Right atrium (fluoro-
 
     /* what he is on right now */
     const openNow = sh.events.filter(e => e.kind === 'consult' && e.pending)
-      .sort((a, b) => (b.stat ? 1 : 0) - (a.stat ? 1 : 0) || a.started - b.started);
+      .sort((a, b) => (b.stat ? 1 : 0) - (a.stat ? 1 : 0) || (a.assignedAt || a.started || a.at || 0) - (b.assignedAt || b.started || b.at || 0));
     html += `<div class="section-label">On now${openNow.length ? ' — ' + openNow.length : ''}</div>`;
     if (openNow.length) {
       html += openNow.map(e => openConsultCard(e, true)).join('');
@@ -5455,7 +5468,7 @@ VW.consult.tipLocations = ['SVC', 'Cavo-atrial junction', 'Right atrium (fluoro-
     const sh = cur();
     const all = sh ? sh.events.filter(e => e.kind === 'consult') : [];
     const open = all.filter(e => e.pending)
-      .sort((a, b) => (b.stat ? 1 : 0) - (a.stat ? 1 : 0) || a.started - b.started);
+      .sort((a, b) => (b.stat ? 1 : 0) - (a.stat ? 1 : 0) || (a.assignedAt || a.started || a.at || 0) - (b.assignedAt || b.started || b.at || 0));
     const list = all.filter(e => !e.pending).sort((a, b) => b.at - a.at);
     const c = sh ? counts(sh) : { consults: 0, stats: 0, unsuccessful: 0 };
     let html = `<h1 class="view-title">Consults</h1>
@@ -5492,8 +5505,11 @@ VW.consult.tipLocations = ['SVC', 'Cavo-atrial junction', 'Right atrium (fluoro-
   /* an open consult: the type is banked, the clock is running, details come after the tick */
   function openConsultCard(ev, compact) {
     const t = VW.consult.types.find(x => x.id === ev.ctype);
-    const mins = Math.max(0, Math.round((Date.now() - (ev.started || ev.at)) / 60000));
-    const since = `${fmtClock(ev.started || ev.at)}${mins ? ' · ' + mins + ' min' : ' · just now'}`;
+    const inRoom = !!ev.started;
+    const mins = inRoom ? Math.max(0, Math.round((Date.now() - ev.started) / 60000)) : 0;
+    const since = inRoom
+      ? `${fmtClock(ev.started)}${mins ? ' · ' + mins + ' min' : ' · just now'}`
+      : `Assigned ${fmtClock(ev.assignedAt || ev.at)}`;
     return `<div class="open-consult${ev.stat ? ' is-stat' : ''}${compact ? ' is-compact' : ''}" data-open-consult="${ev.id}">
       <div class="oc-top">
         <span class="oc-ico">${I[(t && t.icon) || 'consult'] || I.consult}</span>
@@ -5502,7 +5518,11 @@ VW.consult.tipLocations = ['SVC', 'Cavo-atrial junction', 'Right atrium (fluoro-
           <div class="oc-since">${esc(t ? t.label : 'Consult')} · ${since}</div>
         </div>
       </div>
-      <button class="oc-done" data-act="finishConsult" data-id="${ev.id}">
+      ${inRoom ? '' : `<button class="oc-done" data-act="enterRoom" data-id="${ev.id}">
+        <span class="oc-box">${I.play}</span>
+        <span>In the room — start the clock</span>
+      </button>`}
+      <button class="oc-done" data-act="finishConsult" data-id="${ev.id}"${inRoom ? '' : ' style="margin-top:6px"'}>
         <span class="oc-box">${I.ok}</span>
         <span>Done — stamp the time</span>
       </button>
@@ -7014,6 +7034,7 @@ ICU-3 CVC dressing change
       case 'break': toggleBreak(); break;
       case 'newConsult': if (requireShift()) openConsult(); break;
       case 'finishConsult': finishConsult(id); break;
+      case 'enterRoom': enterRoom(id); break;
       case 'editOpenRoom': editOpenRoom(id); break;
       case 'dropConsult': dropConsult(id); break;
       case 'toggleOpenStat': {
