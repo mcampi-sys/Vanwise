@@ -4493,6 +4493,7 @@ VW.consult.tipLocations = ['SVC', 'Cavo-atrial junction', 'Right atrium (fluoro-
   function bodyDressing(ev) {
     const d = ev.dressing || {};
     return `
+      ${checkBox('drDischarged', 'Discharged before seeing — change not done', d.discharged)}
       <div class="field"><label class="field-label">Device</label>
         ${devChips('drDevice', ['piv', 'midline', 'picc', 'cvc', 'port', 'apheresis'], d.device || 'picc')}</div>
       <div class="field"><label class="field-label">Dressing applied</label>
@@ -4512,6 +4513,7 @@ VW.consult.tipLocations = ['SVC', 'Cavo-atrial junction', 'Right atrium (fluoro-
   }
   function readDressing(root) {
     return {
+      discharged: (($('#drDischarged', root) || {}).checked) || false,
       device: chipValue(root, 'drDevice'),
       type: chipValue(root, 'drType'),
       exposure: ($('#drExp', root) || {}).value || '',
@@ -4903,6 +4905,7 @@ VW.consult.tipLocations = ['SVC', 'Cavo-atrial junction', 'Right atrium (fluoro-
       }
       if (dr) {
         const seg = [];
+        if (dr.discharged) seg.push('discharged before seeing');
         if (dr.type) seg.push(dr.type);
         if (dr.exposure) seg.push('exp ' + dr.exposure + ' cm');
         if (dr.circ) seg.push('circ ' + dr.circ + ' cm');
