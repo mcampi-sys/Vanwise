@@ -3538,6 +3538,7 @@ VW.grade.excuse = function (ev) {
   if (!ev) return 'no record';
   if (ev.pending) return 'still open';
   if (ev.clinicalHold) return 'clinically driven';
+  if (ev.canceled) return 'canceled';
   if (!ev.started || !ev.at) return 'no start time';
   const mins = (ev.at - ev.started) / 60000;
   if (mins < 1) return 'logged after the fact';
@@ -3707,7 +3708,8 @@ VW.consult.types = [
   { id: 'trouble',  label: 'Troubleshooting',   hint: 'Occlusion, no blood return, tPA', icon: 'wrench', tone: 'tone-clay' },
   { id: 'clearing', label: 'Clearing a device', hint: 'Clear an existing line for use',  icon: 'shield', tone: '' },
   { id: 'deaccess', label: 'Access / de-access',hint: 'Port needle in or out, removal',  icon: 'swap',   tone: '' },
-  { id: 'dressing', label: 'Dressing change',   hint: 'Routine or PRN',                  icon: 'dressing', tone: '' }
+  { id: 'dressing', label: 'Dressing change',   hint: 'Routine or PRN',                  icon: 'dressing', tone: '' },
+  { id: 'education', label: 'Education',        hint: 'Teaching / inservice time',        icon: 'book',     tone: '' }
 ];
 
 /* devices offered per branch */
@@ -4525,12 +4527,29 @@ VW.consult.tipLocations = ['SVC', 'Cavo-atrial junction', 'Right atrium (fluoro-
     };
   }
 
+  function bodyEducation(ev) {
+    const d = ev.education || {};
+    return `
+      <div class="field"><label for="edTopic">Topic</label>
+        <input type="text" id="edTopic" placeholder="e.g. PIV best-practice inservice" value="${esc(d.topic || '')}"></div>
+      <div class="field"><label class="field-label">Audience</label>
+        ${chipGroup('edAud', ['RNs', 'New hires', 'Patient / family', 'Students', 'Other'].map(x => ({ v: x, l: x })), d.audience || null, false)}</div>
+      <div class="help">The clock already ran while you were teaching — the stamped time is the justification.</div>`;
+  }
+  function readEducation(root) {
+    return {
+      topic: (($('#edTopic', root) || {}).value || '').trim(),
+      audience: chipValue(root, 'edAud')
+    };
+  }
+
   const CONSULT_BRANCH = {
     access:   { body: bodyAccess,   read: readAccess,   key: 'access' },
     trouble:  { body: bodyTrouble,  read: readTrouble,  key: 'trouble' },
     clearing: { body: bodyClearing, read: readClearing, key: 'clearing' },
     deaccess: { body: bodyDeaccess, read: readDeaccess, key: 'deaccess' },
-    dressing: { body: bodyDressing, read: readDressing, key: 'dressing' }
+    dressing: { body: bodyDressing, read: readDressing, key: 'dressing' },
+    education: { body: bodyEducation, read: readEducation, key: 'education' }
   };
 
   /* step 1 — which kind of consult. Nothing else is asked yet:
@@ -4646,6 +4665,7 @@ VW.consult.tipLocations = ['SVC', 'Cavo-atrial junction', 'Right atrium (fluoro-
         ${branch.body(ev)}
         <hr>
         ${checkBox('cHold', 'Length was clinically driven (dwell, x-ray, waiting on someone)', ev.clinicalHold)}
+        ${checkBox('cCanceled', 'Consult canceled', ev.canceled)}
         <div class="help" style="margin-top:-4px;margin-bottom:10px">Ticking this keeps the consult out of the pace score. Time you did not control is not your pace.</div>
         ${checkBox('cFlag', 'Flag this interaction (avoid list)', ev.flag)}
         <div class="field" style="margin-top:12px"><label for="cNote">Note</label>
@@ -4678,6 +4698,7 @@ VW.consult.tipLocations = ['SVC', 'Cavo-atrial junction', 'Right atrium (fluoro-
           started: ev.started || null,
           durMs: ev.durMs != null ? ev.durMs : null,
           clinicalHold: (($('#cHold', root) || {}).checked) || false,
+          canceled: (($('#cCanceled', root) || {}).checked) || false,
           at: timeToTs(dayKey, timeVal),
           stat: $('[data-stat] button[data-v="stat"]', root).getAttribute('aria-pressed') === 'true',
           room: ($('#cRoom', root) || {}).value || '',
@@ -4850,7 +4871,8 @@ VW.consult.tipLocations = ['SVC', 'Cavo-atrial junction', 'Right atrium (fluoro-
     const bits = [];
     if (ev.room) bits.push(ev.room);
     if (ev.kind === 'consult') {
-      const a = ev.access, t = ev.trouble, c = ev.clearing, d = ev.deaccess, dr = ev.dressing;
+      const a = ev.access, t = ev.trouble, c = ev.clearing, d = ev.deaccess, dr = ev.dressing, ed = ev.education;
+      if (ev.canceled) bits.push('consult canceled');
       if (a) {
         const seg = [];
         if (a.gauge) seg.push(a.gauge + ' G');
@@ -4913,6 +4935,12 @@ VW.consult.tipLocations = ['SVC', 'Cavo-atrial junction', 'Right atrium (fluoro-
         if (dr.securement) seg.push('securement changed');
         if (dr.phleb !== '' && dr.phleb != null) seg.push('phlebitis ' + dr.phleb);
         if (dr.inf !== '' && dr.inf != null) seg.push('infiltration ' + dr.inf);
+        if (seg.length) bits.push(seg.join(' · '));
+      }
+      if (ed) {
+        const seg = [];
+        if (ed.topic) seg.push(ed.topic);
+        if (ed.audience) seg.push(ed.audience);
         if (seg.length) bits.push(seg.join(' · '));
       }
     }
