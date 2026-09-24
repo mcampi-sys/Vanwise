@@ -4625,7 +4625,7 @@ VW.consult.tipLocations = ['SVC', 'Cavo-atrial junction', 'Right atrium (fluoro-
     if (!ev || ev.started) return;
     ev.started = Date.now();
     save(true); render();
-    toast('In the room — clock running');
+    toast('In the room — timer running');
   }
 
   /* the tick: stamp the finish time, then let the details out */
@@ -5520,7 +5520,7 @@ VW.consult.tipLocations = ['SVC', 'Cavo-atrial junction', 'Right atrium (fluoro-
       </div>
       ${inRoom ? '' : `<button class="oc-done" data-act="enterRoom" data-id="${ev.id}">
         <span class="oc-box">${I.play}</span>
-        <span>In the room — start the clock</span>
+        <span>In the room — start the timer</span>
       </button>`}
       <button class="oc-done" data-act="finishConsult" data-id="${ev.id}"${inRoom ? '' : ' style="margin-top:6px"'}>
         <span class="oc-box">${I.ok}</span>
