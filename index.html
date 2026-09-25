@@ -3861,8 +3861,9 @@ VW.consult.tipLocations = ['SVC', 'Cavo-atrial junction', 'Right atrium (fluoro-
   }
 
   /* official schedule import: Miguel's shifts, seeded once */
-  const ROSTER_V = 2;
+  const ROSTER_V = 3;
   const MIGUEL_DATES = ["2026-09-22", "2026-09-24", "2026-09-25", "2026-09-27", "2026-09-28", "2026-09-30", "2026-10-05", "2026-10-06", "2026-10-07", "2026-10-11", "2026-10-12", "2026-10-14", "2026-10-20", "2026-10-22", "2026-10-23", "2026-10-25", "2026-10-26", "2026-10-28", "2026-11-03", "2026-11-05", "2026-11-06", "2026-11-08", "2026-11-09", "2026-11-11"];
+  const MIGUEL_PICKUPS = [{ date: '2026-10-16', type: 'Day shift', start: '07:00', end: '19:00', note: 'pickup' }];
   (function importRoster(){
     if ((S.rosterV || 0) >= ROSTER_V) return;
     MIGUEL_DATES.forEach(d => {
@@ -3872,6 +3873,11 @@ VW.consult.tipLocations = ['SVC', 'Cavo-atrial junction', 'Right atrium (fluoro-
       } else if (existing.type === 'Day shift' && existing.start === '11:00' && existing.end === '23:30') {
         /* v1 seeded the 11:00-23:30 run as 'Day shift'; that run is the mid shift */
         existing.type = 'Mid shift';
+      }
+    });
+    MIGUEL_PICKUPS.forEach(p => {
+      if (!S.schedule.some(x => x.date === p.date)) {
+        S.schedule.push({ id: uid(), date: p.date, type: p.type, start: p.start, end: p.end, facility: S.profile.facility || '', note: p.note || '' });
       }
     });
     S.schedule.sort((a, b) => a.date.localeCompare(b.date));
