@@ -4570,6 +4570,13 @@ VW.consult.tipLocations = ['SVC', 'Cavo-atrial junction', 'Right atrium (fluoro-
             <button type="button" class="calm" data-v="routine" aria-pressed="true">Routine</button>
           </div>
         </div>
+        <div class="field">
+          <label class="field-label">Isolation</label>
+          <div class="stat-toggle" data-niso>
+            <button type="button" data-v="iso" aria-pressed="false">Isolation</button>
+            <button type="button" class="calm" data-v="no" aria-pressed="true">None</button>
+          </div>
+        </div>
         <div class="section-label">What kind?</div>
         <div class="hub" data-ctypes>` + VW.consult.types.map(t =>
         `<button class="hub-card ${t.tone}" data-ctype="${t.id}" aria-pressed="false">
@@ -4582,6 +4589,10 @@ VW.consult.tipLocations = ['SVC', 'Cavo-atrial junction', 'Right atrium (fluoro-
         if (go) { go.disabled = true; go.textContent = 'Pick a type'; }
         $$('[data-nstat] button', back).forEach(btn => btn.addEventListener('click', () => {
           $$('[data-nstat] button', back).forEach(x => x.setAttribute('aria-pressed', 'false'));
+          btn.setAttribute('aria-pressed', 'true');
+        }));
+        $$('[data-niso] button', back).forEach(btn => btn.addEventListener('click', () => {
+          $$('[data-niso] button', back).forEach(x => x.setAttribute('aria-pressed', 'false'));
           btn.setAttribute('aria-pressed', 'true');
         }));
         $$('[data-ctype]', back).forEach(card => card.addEventListener('click', () => {
@@ -4597,19 +4608,21 @@ VW.consult.tipLocations = ['SVC', 'Cavo-atrial junction', 'Right atrium (fluoro-
         const room = ((($('#ncRoom', root) || {}).value) || '').trim();
         const statBtn = $('[data-nstat] button[data-v="stat"]', root);
         const stat = !!statBtn && statBtn.getAttribute('aria-pressed') === 'true';
-        startConsult(picked.dataset.ctype, room, stat);
+        const isoBtn = $('[data-niso] button[data-v="iso"]', root);
+        const isolation = !!isoBtn && isoBtn.getAttribute('aria-pressed') === 'true';
+        startConsult(picked.dataset.ctype, room, stat, isolation);
       }
     });
   }
 
   /* an assigned consult is a real event, just not timed yet —
      the clock only starts when he walks into the room */
-  function startConsult(type, room, stat) {
+  function startConsult(type, room, stat, isolation) {
     const sh = S.current; if (!sh) return;
     const now = Date.now();
     sh.events.push({
       id: uid(), kind: 'consult', ctype: type, pending: true,
-      assignedAt: now, started: null, at: now, stat: !!stat, room: room || ''
+      assignedAt: now, started: null, at: now, stat: !!stat, isolation: !!isolation, room: room || ''
     });
     sh.events.sort((a, b) => a.at - b.at);
     save(true);
@@ -4884,6 +4897,7 @@ VW.consult.tipLocations = ['SVC', 'Cavo-atrial junction', 'Right atrium (fluoro-
     if (ev.kind === 'consult') {
       const a = ev.access, t = ev.trouble, c = ev.clearing, d = ev.deaccess, dr = ev.dressing, ed = ev.education;
       if (ev.canceled) bits.push('consult canceled');
+      if (ev.isolation) bits.push('isolation precautions');
       if (ev.assignedAt && ev.started && ev.started - ev.assignedAt >= 60000)
         bits.push('assigned ' + fmtClock(ev.assignedAt));
       if (a) {
@@ -4981,6 +4995,7 @@ VW.consult.tipLocations = ['SVC', 'Cavo-atrial junction', 'Right atrium (fluoro-
       <div class="entry-body">
         <div class="entry-title">${esc(eventTitle(ev))}
           ${ev.stat ? '<span class="badge badge-stat">STAT</span>' : ''}
+          ${ev.kind === 'consult' && ev.isolation ? '<span class="badge badge-gold">Isolation</span>' : ''}
           ${ev.flag ? '<span class="badge badge-danger">Flagged</span>' : ''}
           ${g && g.band ? `<span class="pace pace-${g.band}">${VW.grade.bandLabel[g.band]}</span>` : ''}
           ${g && g.excused === 'clinically driven' ? '<span class="pace pace-held">clinical</span>' : ''}
@@ -5514,7 +5529,7 @@ VW.consult.tipLocations = ['SVC', 'Cavo-atrial junction', 'Right atrium (fluoro-
       <div class="oc-top">
         <span class="oc-ico">${I[(t && t.icon) || 'consult'] || I.consult}</span>
         <div class="grow" style="min-width:0">
-          <div class="oc-name">${ev.room ? esc(ev.room) : '<span class="oc-noroom">No room</span>'}${ev.stat ? ' <span class="badge badge-stat">STAT</span>' : ''}</div>
+          <div class="oc-name">${ev.room ? esc(ev.room) : '<span class="oc-noroom">No room</span>'}${ev.stat ? ' <span class="badge badge-stat">STAT</span>' : ''}${ev.isolation ? ' <span class="badge badge-gold">Isolation</span>' : ''}</div>
           <div class="oc-since">${esc(t ? t.label : 'Consult')} · ${since}</div>
         </div>
       </div>
@@ -5531,6 +5546,7 @@ VW.consult.tipLocations = ['SVC', 'Cavo-atrial junction', 'Right atrium (fluoro-
         : `<div class="oc-drop">
         <button data-act="editOpenRoom" data-id="${ev.id}">${ev.room ? 'Change room' : 'Add room'}</button>
         <button data-act="toggleOpenStat" data-id="${ev.id}">${ev.stat ? 'Not STAT' : 'Mark STAT'}</button>
+        <button data-act="toggleOpenIso" data-id="${ev.id}">${ev.isolation ? 'No isolation' : 'Isolation'}</button>
         <button data-act="dropConsult" data-id="${ev.id}">Discard</button>
       </div>`}
     </div>`;
@@ -7041,6 +7057,11 @@ ICU-3 CVC dressing change
         const sh = cur(); if (!sh) break;
         const ev = sh.events.find(x => x.id === id); if (!ev) break;
         ev.stat = !ev.stat; save(true); render(); break;
+      }
+      case 'toggleOpenIso': {
+        const sh = cur(); if (!sh) break;
+        const ev = sh.events.find(x => x.id === id); if (!ev) break;
+        ev.isolation = !ev.isolation; save(true); render(); break;
       }
       case 'newCheck': if (requireShift()) openCheck(); break;
       case 'newMet': if (requireShift()) openMet(); break;
