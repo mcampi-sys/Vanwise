@@ -3834,6 +3834,8 @@ VW.consult.tipLocations = ['SVC', 'Cavo-atrial junction', 'Right atrium (fluoro-
     rounds: []
   };
 
+  /* Official unit roster 2026-09-20..2026-11-14: date -> {day:{name:shift}, night:{name:shift}} */
+  const ROSTER = {};
   let S = load();
   function load() {
     try {
@@ -3855,6 +3857,21 @@ VW.consult.tipLocations = ['SVC', 'Cavo-atrial junction', 'Right atrium (fluoro-
     if (now) { clearTimeout(saveTimer); write(); return; }
     clearTimeout(saveTimer); saveTimer = setTimeout(write, 250);
   }
+
+  /* official schedule import: Miguel's shifts, seeded once */
+  const ROSTER_V = 1;
+  const MIGUEL_DATES = ["2026-09-22", "2026-09-24", "2026-09-25", "2026-09-27", "2026-09-28", "2026-09-30", "2026-10-05", "2026-10-06", "2026-10-07", "2026-10-11", "2026-10-12", "2026-10-14", "2026-10-20", "2026-10-22", "2026-10-23", "2026-10-25", "2026-10-26", "2026-10-28", "2026-11-03", "2026-11-05", "2026-11-06", "2026-11-08", "2026-11-09", "2026-11-11"];
+  (function importRoster(){
+    if ((S.rosterV || 0) >= ROSTER_V) return;
+    MIGUEL_DATES.forEach(d => {
+      if (!S.schedule.some(x => x.date === d)) {
+        S.schedule.push({ id: uid(), date: d, type: 'Day shift', start: '11:00', end: '23:30', facility: S.profile.facility || '', note: '' });
+      }
+    });
+    S.schedule.sort((a, b) => a.date.localeCompare(b.date));
+    S.rosterV = ROSTER_V;
+    save(true);
+  })();
 
   /* video + resource libraries: seeded once, then user-owned */
   const SEED_VERSION = 2;
@@ -6275,6 +6292,7 @@ ICU-3 CVC dressing change
     factors:   { title: 'What matters', blurb: 'The checks that change your plan, and why', icon: 'brain',  tone: 'tone-green' },
     notes:     { title: 'Shift notes', blurb: 'Timestamped notes for this shift',           icon: 'note',   tone: '' },
     calendar:  { title: 'Calendar',  blurb: 'Schedule shifts, see what you worked',          icon: 'shift',  tone: '' },
+    crew:      { title: "Who's working", blurb: 'See your crew for each scheduled day', icon: 'shift', tone: 'tone-green' },
     history:   { title: 'History',   blurb: 'Open a past shift and review everything',       icon: 'log',    tone: '' },
     settings:  { title: 'Settings',  blurb: 'Targets, reminders, notifications, theme',      icon: 'theme',  tone: '' },
     data:      { title: 'Backup',    blurb: 'Export, import, storage',                       icon: 'link',   tone: '' }
@@ -6287,6 +6305,7 @@ ICU-3 CVC dressing change
       <div class="view-sub">The checks that change your plan, and the reasoning behind each one</div>` + refFactors();
     if (sub.more === 'notes') return `<div class="backbar"><button data-submore="home">${I.back} More</button></div>` + viewNotes();
     if (sub.more === 'calendar') return viewCalendar();
+    if (sub.more === 'crew') return viewCrew();
     if (sub.more === 'history') return viewHistory();
     if (sub.more === 'settings') return viewSettings();
     if (sub.more === 'data') return viewData();
@@ -6304,6 +6323,36 @@ ICU-3 CVC dressing change
     html += `<button class="list-row" data-submore="flags" style="margin-top:14px">
       <div class="grow"><b>Avoid list</b><span>${S.flags.length} flagged interaction${S.flags.length === 1 ? '' : 's'}</span></div>${I.chev}</button>`;
     html += `<div class="wordmark-foot">Veinwise · Aeterna Atelier</div>`;
+    return html;
+  }
+
+  function fmtRosterShift(s) {
+    const p = String(s).split(' ');
+    if (p.length !== 2) return s;
+    const f = x => x.length === 4 ? x.slice(0, 2) + ':' + x.slice(2) : x.padStart(2, '0') + ':00';
+    return f(p[0]) + '\u2013' + f(p[1]);
+  }
+  let crewDate = null;
+  function viewCrew() {
+    const schedDates = [...new Set(S.schedule.map(x => x.date))].filter(d => ROSTER[d]).sort();
+    let html = `<button class="btn btn-ghost btn-sm" data-submore="home" style="margin-bottom:12px">${I.back} More</button>
+      <h1 class="view-title">Who's working</h1>
+      <div class="view-sub">Your crew for each scheduled shift</div>`;
+    if (!schedDates.length) return html + `<div class="empty"><b>No scheduled shifts yet</b>Add shifts in the Calendar and they will show up here.</div>`;
+    const today = new Date(); const tk = today.getFullYear() + '-' + String(today.getMonth() + 1).padStart(2, '0') + '-' + String(today.getDate()).padStart(2, '0');
+    if (!crewDate || schedDates.indexOf(crewDate) < 0) crewDate = schedDates.find(d => d >= tk) || schedDates[schedDates.length - 1];
+    html += `<div class="chip-row" style="margin:14px 0 4px">` + schedDates.map(d =>
+      `<button class="chip${d === crewDate ? ' on' : ''}" data-crewdate="${d}">${fmtDate(d)}</button>`).join('') + `</div>`;
+    const r = ROSTER[crewDate] || { day: {}, night: {} };
+    const isMe = n => n.toLowerCase().indexOf('narvaez') >= 0;
+    const row = (n, s) => `<div class="list-row${isMe(n) ? ' me' : ''}"><div class="grow"><b>${esc(n)}</b><span>${fmtRosterShift(s)}</span></div>${isMe(n) ? '<span class="badge">You</span>' : ''}</div>`;
+    html += `<h3 class="sec-h">Days</h3><div class="list">`;
+    const dn = Object.keys(r.day).sort();
+    html += dn.length ? dn.map(n => row(n, r.day[n])).join('') : `<div class="empty">No day staff listed</div>`;
+    html += `</div><h3 class="sec-h">Nights</h3><div class="list">`;
+    const nn = Object.keys(r.night).sort();
+    html += nn.length ? nn.map(n => row(n, r.night[n])).join('') : `<div class="empty">No night staff listed</div>`;
+    html += `</div><div class="wordmark-foot">Roster 9/20/26\u201311/14/26</div>`;
     return html;
   }
 
@@ -6947,6 +6996,9 @@ ICU-3 CVC dressing change
       if (sub.more === 'reference') sub.ref = 'hub';
       render(); return;
     }
+
+    const cd = e.target.closest('[data-crewdate]');
+    if (cd) { crewDate = cd.dataset.crewdate; render(); return; }
 
     const tg = e.target.closest('[data-toggle]');
     if (tg) {
