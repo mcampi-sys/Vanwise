@@ -1,9 +1,9 @@
-/* Veinwise service worker, v23 (cart loading timer)
+/* Veinwise service worker, v24 (consult reason field)
    The page itself is network-first so a new build shows up on the next open
    with signal, and the cached copy keeps it working offline. Everything else
    (policies, intro, icons) is cache-first. Shift data lives in localStorage,
    which this file never touches. */
-const CACHE = 'veinwise-v23';
+const CACHE = 'veinwise-v24';
 const CORE = ['./', 'index.html', 'manifest.webmanifest', 'icon-192.png', 'icon-512.png', 'icon-maskable-512.png'];
 const EXTRA = ['intro.webm', 'intro.mp4',
   'policies/BD-120470-powerflow-vs-powerport.pdf', 'policies/M03-03-564-high-alert-meds.pdf',
