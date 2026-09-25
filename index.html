@@ -528,6 +528,7 @@ legend{padding:0;}
 .cal-day .marks{display:flex;gap:2px;}
 .cal-day .mk{width:5px;height:5px;border-radius:50%;}
 .mk.sched{background:var(--accent);}
+.mk.mid{background:var(--gold-500);}
 .mk.night{background:var(--blue-600);}
 .mk.off{background:var(--ink-3);}
 .mk.worked{background:var(--good);}
@@ -535,6 +536,7 @@ legend{padding:0;}
 .cal-legend span{display:flex;align-items:center;gap:5px;}
 .cal-legend .lg{width:7px;height:7px;border-radius:50%;display:inline-block;}
 .cal-legend .lg.sched{background:var(--accent);}
+.cal-legend .lg.mid{background:var(--gold-500);}
 .cal-legend .lg.night{background:var(--blue-600);}
 .cal-legend .lg.off{background:var(--ink-3);}
 .cal-legend .lg.worked{background:var(--good);}
@@ -3859,13 +3861,17 @@ VW.consult.tipLocations = ['SVC', 'Cavo-atrial junction', 'Right atrium (fluoro-
   }
 
   /* official schedule import: Miguel's shifts, seeded once */
-  const ROSTER_V = 1;
+  const ROSTER_V = 2;
   const MIGUEL_DATES = ["2026-09-22", "2026-09-24", "2026-09-25", "2026-09-27", "2026-09-28", "2026-09-30", "2026-10-05", "2026-10-06", "2026-10-07", "2026-10-11", "2026-10-12", "2026-10-14", "2026-10-20", "2026-10-22", "2026-10-23", "2026-10-25", "2026-10-26", "2026-10-28", "2026-11-03", "2026-11-05", "2026-11-06", "2026-11-08", "2026-11-09", "2026-11-11"];
   (function importRoster(){
     if ((S.rosterV || 0) >= ROSTER_V) return;
     MIGUEL_DATES.forEach(d => {
-      if (!S.schedule.some(x => x.date === d)) {
-        S.schedule.push({ id: uid(), date: d, type: 'Day shift', start: '11:00', end: '23:30', facility: S.profile.facility || '', note: '' });
+      const existing = S.schedule.find(x => x.date === d);
+      if (!existing) {
+        S.schedule.push({ id: uid(), date: d, type: 'Mid shift', start: '11:00', end: '23:30', facility: S.profile.facility || '', note: '' });
+      } else if (existing.type === 'Day shift' && existing.start === '11:00' && existing.end === '23:30') {
+        /* v1 seeded the 11:00-23:30 run as 'Day shift'; that run is the mid shift */
+        existing.type = 'Mid shift';
       }
     });
     S.schedule.sort((a, b) => a.date.localeCompare(b.date));
@@ -6397,7 +6403,7 @@ ICU-3 CVC dressing change
       title: dates.length + ' day' + (dates.length === 1 ? '' : 's'),
       body: `<div class="help" style="margin-bottom:14px">${esc(dates.map(fmtDate).join(' · '))}</div>
         <div class="field"><label class="field-label">Type</label>
-          ${chipGroup('mSchType', [{ v: 'Day shift', l: 'Day' }, { v: 'Night shift', l: 'Night' }, { v: 'Call', l: 'Call' }, { v: 'PTO', l: 'PTO' }], 'Day shift', false)}</div>
+          ${chipGroup('mSchType', [{ v: 'Mid shift', l: 'Mid' }, { v: 'Day shift', l: 'Day' }, { v: 'Night shift', l: 'Night' }, { v: 'Call', l: 'Call' }, { v: 'PTO', l: 'PTO' }], 'Mid shift', false)}</div>
         <div class="inline-2">
           <div class="field"><label for="mSchStart">Start</label><input type="time" id="mSchStart" value="11:00"></div>
           <div class="field"><label for="mSchEnd">End</label><input type="time" id="mSchEnd" value="23:30"></div>
@@ -6414,12 +6420,13 @@ ICU-3 CVC dressing change
           const st = $('#mSchStart', back), en = $('#mSchEnd', back);
           if (!st || !en) return;
           if (v === 'Night shift') { st.value = '19:00'; en.value = '07:00'; }
-          else if (v === 'Day shift') { st.value = '11:00'; en.value = '23:30'; }
+          else if (v === 'Day shift') { st.value = '07:00'; en.value = '19:30'; }
+          else if (v === 'Mid shift') { st.value = '11:00'; en.value = '23:30'; }
         }, 0));
       },
       onConfirm: () => {
         const root = $('.sheet', sheetStack[sheetStack.length - 1]);
-        const type = chipValue(root, 'mSchType') || 'Day shift';
+        const type = chipValue(root, 'mSchType') || 'Mid shift';
         const start = ($('#mSchStart', root) || {}).value || '';
         const end = ($('#mSchEnd', root) || {}).value || '';
         const facility = ($('#mSchFac', root) || {}).value || '';
@@ -6876,10 +6883,11 @@ ICU-3 CVC dressing change
       const on = calSel.indexOf(k) >= 0;
       const kinds = (sched[k] || []).map(s => s.type || '');
       const night = kinds.some(t => /night/i.test(t));
-      const day = kinds.some(t => /day/i.test(t));
+      const day = kinds.some(t => /day/i.test(t) && !/mid/i.test(t));
+      const mid = kinds.some(t => /mid/i.test(t));
       const off = kinds.some(t => /pto|off/i.test(t));
       cells += `<button class="cal-day${k === todayK ? ' today' : ''}${on ? ' picked' : ''}" data-day="${k}">
-        <span>${d}</span><span class="marks">${day ? '<span class="mk sched"></span>' : ''}${night ? '<span class="mk night"></span>' : ''}${off ? '<span class="mk off"></span>' : ''}${worked[k] ? '<span class="mk worked"></span>' : ''}</span></button>`;
+        <span>${d}</span><span class="marks">${day ? '<span class="mk sched"></span>' : ''}${mid ? '<span class="mk mid"></span>' : ''}${night ? '<span class="mk night"></span>' : ''}${off ? '<span class="mk off"></span>' : ''}${worked[k] ? '<span class="mk worked"></span>' : ''}</span></button>`;
     }
     const monthName = first.toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
     return `<div class="cal-head">
@@ -6889,7 +6897,7 @@ ICU-3 CVC dressing change
       </div>
       <div class="cal-grid${o.compact ? ' cal-sm' : ''}">${['S', 'M', 'T', 'W', 'T', 'F', 'S'].map(d => `<div class="cal-dow">${d}</div>`).join('')}${cells}</div>
       ${o.legend === false ? '' : `<div class="cal-legend">
-        <span><i class="lg sched"></i> Day</span><span><i class="lg night"></i> Night</span>
+        <span><i class="lg sched"></i> Day</span><span><i class="lg mid"></i> Mid</span><span><i class="lg night"></i> Night</span>
         <span><i class="lg off"></i> PTO</span><span><i class="lg worked"></i> Worked</span></div>`}`;
   }
 
@@ -7210,7 +7218,7 @@ ICU-3 CVC dressing change
           <button class="icon-btn" data-act="delSched" data-id="${s.id}" aria-label="Remove">${I.trash}</button></div>`).join('') : ''}
         <div class="section-label">Add a scheduled shift</div>
         <div class="field"><label class="field-label">Type</label>
-          ${chipGroup('schType', [{ v: 'Day shift', l: 'Day' }, { v: 'Night shift', l: 'Night' }, { v: 'Call', l: 'Call' }, { v: 'PTO', l: 'PTO' }], 'Day shift', false)}</div>
+          ${chipGroup('schType', [{ v: 'Mid shift', l: 'Mid' }, { v: 'Day shift', l: 'Day' }, { v: 'Night shift', l: 'Night' }, { v: 'Call', l: 'Call' }, { v: 'PTO', l: 'PTO' }], 'Mid shift', false)}</div>
         <div class="inline-2">
           <div class="field"><label for="schStart">Start</label><input type="time" id="schStart" value="11:00"></div>
           <div class="field"><label for="schEnd">End</label><input type="time" id="schEnd" value="23:30"></div>
@@ -7225,13 +7233,14 @@ ICU-3 CVC dressing change
           const st = $('#schStart', back), en = $('#schEnd', back);
           if (!st || !en) return;
           if (v === 'Night shift') { st.value = '19:00'; en.value = '07:00'; }
-          else if (v === 'Day shift') { st.value = '11:00'; en.value = '23:30'; }
+          else if (v === 'Day shift') { st.value = '07:00'; en.value = '19:30'; }
+          else if (v === 'Mid shift') { st.value = '11:00'; en.value = '23:30'; }
         }, 0));
       },
       onConfirm: () => {
         const root = $('.sheet', sheetStack[sheetStack.length - 1]);
         S.schedule.push({
-          id: uid(), date: k, type: chipValue(root, 'schType') || 'Day shift',
+          id: uid(), date: k, type: chipValue(root, 'schType') || 'Mid shift',
           start: ($('#schStart', root) || {}).value || '', end: ($('#schEnd', root) || {}).value || '',
           facility: ($('#schFac', root) || {}).value || '', note: ($('#schNote', root) || {}).value || ''
         });
