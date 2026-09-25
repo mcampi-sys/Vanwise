@@ -3918,13 +3918,17 @@ VW.consult.tipLocations = ['SVC', 'Cavo-atrial junction', 'Right atrium (fluoro-
   /* ---------------- shift engine ---------------- */
   function newShift() {
     const now = Date.now();
-    return { id: uid(), date: dateKey(now), clockIn: now, clockOut: null, breaks: [], events: [], notes: [], summary: '', nextReminder: now + S.settings.reminderMins * 60000 };
+    return { id: uid(), date: dateKey(now), clockIn: now, clockOut: null, breaks: [], cartLoads: [], events: [], notes: [], summary: '', nextReminder: now + S.settings.reminderMins * 60000 };
   }
   function cur() { return S.current; }
   function breakMs(sh) {
     return (sh.breaks || []).reduce((a, b) => a + ((b.end || Date.now()) - b.start), 0);
   }
   function onBreak(sh) { return (sh.breaks || []).some(b => !b.end); }
+  function cartLoadMs(sh) {
+    return ((sh.cartLoads) || []).reduce((a, l) => a + ((l.end || Date.now()) - l.start), 0);
+  }
+  function onCartLoad(sh) { return ((sh.cartLoads) || []).some(l => !l.end); }
   function workedMs(sh) {
     if (!sh) return 0;
     const end = sh.clockOut || Date.now();
@@ -4076,6 +4080,7 @@ VW.consult.tipLocations = ['SVC', 'Cavo-atrial junction', 'Right atrium (fluoro-
         const wantPdf = pdfBox ? pdfBox.checked : false;
         S.settings.pdfOnOut = wantPdf;
         (sh.breaks || []).forEach(b => { if (!b.end) b.end = Date.now(); });
+        (sh.cartLoads || []).forEach(l => { if (!l.end) l.end = Date.now(); });
         sh.clockOut = Date.now();
         sh.rounds = (S.rounds || []).map(x => Object.assign({}, x));
         S.shifts.unshift(sh); S.current = null;
@@ -4094,6 +4099,21 @@ VW.consult.tipLocations = ['SVC', 'Cavo-atrial junction', 'Right atrium (fluoro-
       sh.breaks.push({ start: Date.now() });
       sh.nextReminder = Date.now() + S.settings.reminderMins * 60000;
       toast(S.settings.breakMins + '-minute break started');
+    }
+    save(true); render();
+  }
+
+  function toggleCartLoad() {
+    const sh = S.current; if (!sh) return;
+    sh.cartLoads = sh.cartLoads || [];
+    const open = sh.cartLoads.filter(l => !l.end);
+    if (open.length) {
+      const now = Date.now();
+      open.forEach(l => { l.end = now; });
+      toast('Cart load logged — took ' + fmtDur(now - open[0].start));
+    } else {
+      sh.cartLoads.push({ start: Date.now() });
+      toast('Cart loading started — tap Done loading when the cart is ready');
     }
     save(true); render();
   }
@@ -5108,14 +5128,17 @@ VW.consult.tipLocations = ['SVC', 'Cavo-atrial junction', 'Right atrium (fluoro-
     const b = breaking ? sh.breaks.find(x => !x.end) : null;
     const breakLeft = b ? (S.settings.breakMins * 60000 - (Date.now() - b.start)) : 0;
     const nextIn = sh.nextReminder ? sh.nextReminder - Date.now() : null;
+    const openLoad = (sh.cartLoads || []).find(l => !l.end);
+    const cartMs = cartLoadMs(sh);
 
     html += `<div class="hero">
       <div class="hero-top"><div style="flex:1">
         <div class="hero-label">${breaking ? 'On break' : 'On shift'}</div>
         <div class="hero-time" id="liveTimer">${fmtDurLong(workedMs(sh))}</div>
-        <div class="hero-meta">In at ${fmtClock(sh.clockIn)} · ${fmtDate(sh.date)}${breakMs(sh) > 60000 ? ' · ' + fmtDur(breakMs(sh)) + ' break' : ''}</div>
+        <div class="hero-meta">In at ${fmtClock(sh.clockIn)} · ${fmtDate(sh.date)}${breakMs(sh) > 60000 ? ' · ' + fmtDur(breakMs(sh)) + ' break' : ''}${openLoad ? ' · loading cart ' + fmtDur(Date.now() - openLoad.start) : (cartMs > 60000 ? ' · ' + fmtDur(cartMs) + ' cart loading' : '')}</div>
       </div></div>
       <div class="hero-actions">
+        <button class="btn btn-on-dark" data-act="cartLoad">${openLoad ? 'Done loading (' + fmtDur(Date.now() - openLoad.start) + ')' : 'Loading cart'}</button>
         <button class="btn btn-on-dark" data-act="break">${breaking ? 'End break' + (breakLeft > 0 ? ' (' + fmtDur(breakLeft) + ' left)' : '') : 'Break'}</button>
         <button class="btn btn-on-dark" data-act="clockOut">Clock out</button>
       </div>
@@ -6483,7 +6506,7 @@ ICU-3 CVC dressing change
           <div class="counter"><b>${c.mets}</b><span>MET / Code</span></div>
         </div>
         <div class="card-flat" style="margin-top:11px;font-size:13px">
-          ${fmtClock(sh.clockIn)} – ${sh.clockOut ? fmtClock(sh.clockOut) : 'open'} · ${fmtDur(workedMs(sh))} worked${breakMs(sh) > 60000 ? ' · ' + fmtDur(breakMs(sh)) + ' break' : ''}<br>
+          ${fmtClock(sh.clockIn)} – ${sh.clockOut ? fmtClock(sh.clockOut) : 'open'} · ${fmtDur(workedMs(sh))} worked${breakMs(sh) > 60000 ? ' · ' + fmtDur(breakMs(sh)) + ' break' : ''}${cartLoadMs(sh) > 60000 ? ' · ' + fmtDur(cartLoadMs(sh)) + ' cart loading' : ''}<br>
           <span class="muted">${c.stats} STAT · ${c.unsuccessful} unsuccessful · ${st.index != null ? st.index + '% of pace' : ''}</span>
         </div>
         <div class="section-label">Grade</div>
@@ -6514,6 +6537,11 @@ ICU-3 CVC dressing change
       lines.push(fmtClock(e.at) + '  ' + eventTitle(e) + (eventDetail(e) ? ' — ' + eventDetail(e) : ''));
     });
     if ((sh.notes || []).length) { lines.push('', 'NOTES'); sh.notes.forEach(n => lines.push(fmtClock(n.at) + '  ' + n.text)); }
+    const _loads = sh.cartLoads || [];
+    if (_loads.length) {
+      lines.push('', 'CART LOADING');
+      _loads.forEach(l => lines.push(fmtClock(l.start) + ' – ' + (l.end ? fmtClock(l.end) : 'open') + '  (' + fmtDur((l.end || Date.now()) - l.start) + ')'));
+    }
     const g = gradeOf(sh);
     if (g.letter) {
       lines.push('', 'GRADE  ' + g.letter + '  ' + g.score + '/100  (' + VW.grade.letterName[g.letter] + ')');
@@ -6578,6 +6606,11 @@ ICU-3 CVC dressing change
     const rDone = rounds.filter(r => r.status === 'done').length;
     const roundRows = rounds.map(r => `<tr><td class="r">${esc(r.room)}</td><td>${esc(devLabel(r.device) || '')}${r.due === 'change' ? '<span class="vr-tag">change due</span>' : ''}${r.note ? `<span class="vr-sub">${esc(r.note)}</span>` : ''}</td>
       <td class="t">${r.status === 'done' ? (r.changed ? 'Changed ' : 'Checked ') + fmtClock(r.at) : '<span class="vp vp-over">Not done</span>'}</td></tr>`).join('');
+    const loads = sh.cartLoads || [];
+    const loadRows = loads.map(l => `<tr>
+      <td class="t">${fmtClock(l.start)}<span class="vr-sub">to ${l.end ? fmtClock(l.end) : 'open'}</span></td>
+      <td><b>Loading cart</b></td>
+      <td class="t">${fmtDur((l.end || Date.now()) - l.start)}</td></tr>`).join('');
     const partRows = g.letter ? g.parts.map(pt => {
       const pct = Math.max(0, Math.min(100, Math.round(pt.got / pt.max * 100)));
       return `<tr><td><b>${esc(pt.label)}</b><div class="vr-bar"><i style="width:${pct}%"></i></div></td><td>${pt.got} / ${pt.max}</td><td>${esc(pt.detail)}</td></tr>`;
@@ -6610,6 +6643,7 @@ ICU-3 CVC dressing change
       ${checks.length ? `<table><thead><tr><th>Time</th><th>Room</th><th>Check</th><th>Findings</th></tr></thead><tbody>${checkRows}</tbody></table>` : '<p class="vr-empty">No checks logged.</p>'}
       ${mets.length ? `<h2>MET / code <small>${mets.length}</small></h2><table><thead><tr><th>Time</th><th>Room</th><th>Call</th><th>Note</th></tr></thead><tbody>${metRows}</tbody></table>` : ''}
       ${rounds.length ? `<h2>Rounds list <small>${rDone} of ${rounds.length} done</small></h2><table><thead><tr><th>Room</th><th>Line</th><th>Status</th></tr></thead><tbody>${roundRows}</tbody></table>` : ''}
+      ${loads.length ? `<h2>Cart loading <small>${loads.length} · ${fmtDur(loads.reduce((a, l) => a + ((l.end || Date.now()) - l.start), 0))} total</small></h2><table><thead><tr><th>Time</th><th>Task</th><th>Took</th></tr></thead><tbody>${loadRows}</tbody></table>` : ''}
       ${(sh.notes || []).length ? `<h2>Shift notes</h2>` + sh.notes.map(n => `<div class="vr-note"><time>${fmtClock(n.at)}</time>${esc(n.text)}</div>`).join('') : ''}
       ${sh.summary ? `<h2>Hand-off</h2><div class="vr-note">${esc(sh.summary)}</div>` : ''}
       <footer class="vr-foot"><span>Personal record. Room numbers only, no patient identifiers.</span><span>Made ${esc(new Date().toLocaleString())} with Veinwise, Aeterna Atelier</span></footer>
@@ -7114,6 +7148,7 @@ ICU-3 CVC dressing change
         break;
       case 'clockOut': clockOut(); break;
       case 'break': toggleBreak(); break;
+      case 'cartLoad': toggleCartLoad(); break;
       case 'newConsult': if (requireShift()) openConsult(); break;
       case 'finishConsult': finishConsult(id); break;
       case 'enterRoom': enterRoom(id); break;
