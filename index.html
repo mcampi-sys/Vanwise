@@ -3720,6 +3720,13 @@ VW.consult.troubleDevices  = ['picc', 'cvc', 'port', 'midline', 'apheresis'];
 VW.consult.clearingDevices = ['picc', 'cvc', 'port', 'midline'];
 VW.consult.deaccessDevices = ['port', 'apheresis', 'picc', 'cvc', 'midline'];
 
+VW.consult.accessReasons = [
+  'New access needed',
+  'EMS line exchange',
+  'Replace failed PIV',
+  'Therapy change — line upgrade'
+];
+
 VW.consult.problems = [
   'No blood return but flushes',
   'Sluggish / increased resistance',
@@ -4313,6 +4320,9 @@ VW.consult.tipLocations = ['SVC', 'Cavo-atrial junction', 'Right atrium (fluoro-
   function bodyAccess(ev) {
     const d = ev.access || {};
     return `
+      <div class="field"><label class="field-label">Reason for consult</label>
+        ${chipGroup('aReason', VW.consult.accessReasons.map(x => ({ v: x, l: x })), d.reason || null, false)}</div>
+
       <div class="field"><label class="field-label">Device placed</label>
         ${devChips('aDevice', VW.consult.accessDevices, d.device || 'piv').replace('data-chipgroup', 'data-onchange="access" data-chipgroup')}</div>
 
@@ -4364,6 +4374,7 @@ VW.consult.tipLocations = ['SVC', 'Cavo-atrial junction', 'Right atrium (fluoro-
     const device = chipValue(root, 'aDevice') || 'piv';
     return {
       device: device,
+      reason: chipValue(root, 'aReason'),
       gauge: chipValue(root, 'aGauge'), length: chipValue(root, 'aLength'),
       fr: chipValue(root, 'aFr'), lumens: chipValue(root, 'aLumens'),
       inserted: ($('#aInserted', root) || {}).value || '',
@@ -4951,6 +4962,7 @@ VW.consult.tipLocations = ['SVC', 'Cavo-atrial junction', 'Right atrium (fluoro-
         bits.push('assigned ' + fmtClock(ev.assignedAt));
       if (a) {
         const seg = [];
+        if (a.reason) seg.push(a.reason);
         if (a.gauge) seg.push(a.gauge + ' G');
         if (a.length) seg.push(a.length + '"');
         if (a.fr) seg.push(a.fr);
