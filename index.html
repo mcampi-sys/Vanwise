@@ -4406,7 +4406,7 @@ VW.consult.tipLocations = ['SVC', 'Cavo-atrial junction', 'Right atrium (fluoro-
         ${chipGroup('aDressing', VW.opts.dressings.map(x => ({ v: x, l: x })), d.dressing || null, false)}</div>
 
       <div class="field"><label class="field-label">Attempts</label>
-        ${chipGroup('aAttempts', ['1', '2'].map(x => ({ v: x, l: x })), d.attempts || '1', false)}
+        ${chipGroup('aAttempts', [{ v: '0', l: '0 · PIV not indicated' }, { v: '1', l: '1' }, { v: '2', l: '2' }], d.attempts || '1', false)}
         <div class="help">One person attempts no more than two. Four attempts total, then notify the physician (M03 10 448).</div></div>
 
       ${checkBox('aUnsucc', 'Unsuccessful', d.unsuccessful)}
@@ -5021,7 +5021,8 @@ VW.consult.tipLocations = ['SVC', 'Cavo-atrial junction', 'Right atrium (fluoro-
         if (a.site) seg.push(a.site);
         if (a.us) seg.push('US');
         if (a.dressing) seg.push(a.dressing);
-        if (a.attempts) seg.push(a.attempts + ' attempt' + (a.attempts === '1' ? '' : 's'));
+        if (a.attempts === '0') seg.push('PIV not indicated — no attempts made');
+        else if (a.attempts) seg.push(a.attempts + ' attempt' + (a.attempts === '1' ? '' : 's'));
         if (seg.length) bits.push(seg.join(' · '));
         const flags = [];
         if (a.unsuccessful) flags.push('unsuccessful' + (a.area ? ' (' + a.area + ')' : ''));
