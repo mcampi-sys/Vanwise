@@ -1,9 +1,9 @@
-/* Veinwise service worker, v26 (Sept 26 mid pickup)
+/* Veinwise service worker, v27 (pull rooms from Blaid)
    The page itself is network-first so a new build shows up on the next open
    with signal, and the cached copy keeps it working offline. Everything else
    (policies, intro, icons) is cache-first. Shift data lives in localStorage,
    which this file never touches. */
-const CACHE = 'veinwise-v26';
+const CACHE = 'veinwise-v27';
 const CORE = ['./', 'index.html', 'manifest.webmanifest', 'icon-192.png', 'icon-512.png', 'icon-maskable-512.png'];
 const EXTRA = ['intro.webm', 'intro.mp4',
   'policies/BD-120470-powerflow-vs-powerport.pdf', 'policies/M03-03-564-high-alert-meds.pdf',
@@ -33,6 +33,11 @@ self.addEventListener('fetch', e => {
   if (req.method !== 'GET') return;
   const url = new URL(req.url);
   if (url.origin !== location.origin) return;
+  if (url.pathname.endsWith('pending-rounds.json')) {
+    /* Blaid's room drops: always network, never cached */
+    e.respondWith(fetch(req, { cache: 'no-store' }).catch(() => Response.error()));
+    return;
+  }
   const isPage = req.mode === 'navigate' || url.pathname.endsWith('/') || url.pathname.endsWith('index.html');
   if (isPage) {
     e.respondWith((async () => {
