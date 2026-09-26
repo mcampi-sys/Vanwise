@@ -1286,6 +1286,8 @@ VW.opts = {
     { id: 'midline',  label: 'Midline' },
     { id: 'picc',     label: 'PICC' },
     { id: 'cvc',      label: 'CVC' },
+    { id: 'cvc-tunneled',    label: 'Tunneled CVC' },
+    { id: 'cvc-nontunneled', label: 'Non-tunneled CVC' },
     { id: 'port',     label: 'Port / IVAD' },
     { id: 'apheresis',label: 'Apheresis / HD' },
     { id: 'io',       label: 'IO' },
@@ -3758,9 +3760,9 @@ VW.consult.types = [
 
 /* devices offered per branch */
 VW.consult.accessDevices   = ['piv', 'usgpiv', 'midline', 'picc'];
-VW.consult.troubleDevices  = ['picc', 'cvc', 'port', 'midline', 'apheresis'];
-VW.consult.clearingDevices = ['picc', 'cvc', 'port', 'midline'];
-VW.consult.deaccessDevices = ['port', 'apheresis', 'picc', 'cvc', 'midline'];
+VW.consult.troubleDevices  = ['picc', 'cvc', 'cvc-tunneled', 'cvc-nontunneled', 'port', 'midline', 'apheresis'];
+VW.consult.clearingDevices = ['picc', 'cvc', 'cvc-tunneled', 'cvc-nontunneled', 'port', 'midline'];
+VW.consult.deaccessDevices = ['port', 'apheresis', 'picc', 'cvc', 'cvc-tunneled', 'cvc-nontunneled', 'midline'];
 
 VW.consult.accessReasons = [
   'New access needed',
@@ -4600,7 +4602,7 @@ VW.consult.tipLocations = ['SVC', 'Cavo-atrial junction', 'Right atrium (fluoro-
     return `
       ${checkBox('drDischarged', 'Discharged before seeing — change not done', d.discharged)}
       <div class="field"><label class="field-label">Device</label>
-        ${devChips('drDevice', ['piv', 'midline', 'picc', 'cvc', 'port', 'apheresis'], d.device || 'picc')}</div>
+        ${devChips('drDevice', ['piv', 'midline', 'picc', 'cvc', 'cvc-tunneled', 'cvc-nontunneled', 'port', 'apheresis'], d.device || 'picc')}</div>
       <div class="field"><label class="field-label">Dressing applied</label>
         ${chipGroup('drType', VW.opts.dressings.map(x => ({ v: x, l: x })), d.type || null, false)}</div>
       <div class="inline-2">
@@ -5360,7 +5362,7 @@ VW.consult.tipLocations = ['SVC', 'Cavo-atrial junction', 'Right atrium (fluoro-
 
   /* ---------------- rounds: the start-of-shift worklist ---------------- */
   /* checks only cover these — no PIV, no IO */
-  const CHECK_DEVICES = ['midline', 'picc', 'cvc', 'port', 'apheresis'];
+  const CHECK_DEVICES = ['midline', 'picc', 'cvc', 'cvc-tunneled', 'cvc-nontunneled', 'port', 'apheresis'];
   const CHECK_FIELDS = [
     { k: 'intact',      l: 'Dressing intact' },
     { k: 'bloodReturn', l: 'Blood return' },
@@ -5373,6 +5375,8 @@ VW.consult.tipLocations = ['SVC', 'Cavo-atrial junction', 'Right atrium (fluoro-
   const ROUND_DEVICES = [
     { re: /\bpicc\b/i,                         id: 'picc' },
     { re: /\bmidlines?\b|\bml\b/i,             id: 'midline' },
+    { re: /\bnon-?tunneled cvc\b/i,            id: 'cvc-nontunneled' },
+    { re: /\btunneled cvc\b|\btunneled central\b/i, id: 'cvc-tunneled' },
     { re: /\bcvc\b|central|\btlc\b|\bijc?\b/i, id: 'cvc' },
     { re: /\bports?\b|\bivad\b|power ?port/i,  id: 'port' },
     { re: /dialysis|\bhd\b|trialysis|apheresis|crrt|perma/i, id: 'apheresis' }
@@ -5503,7 +5507,7 @@ VW.consult.tipLocations = ['SVC', 'Cavo-atrial junction', 'Right atrium (fluoro-
         </div>`}`;
 
     if (it.status === 'done') {
-      const missing = !it.exposure && !it.circ && (it.device === 'picc' || it.device === 'midline' || it.device === 'cvc');
+      const missing = !it.exposure && !it.circ && (it.device === 'picc' || it.device === 'midline' || it.device === 'cvc' || it.device === 'cvc-tunneled' || it.device === 'cvc-nontunneled');
       return `<div class="round-card is-done${open ? ' is-open' : ''}" data-round="${it.id}">
         <button class="rc-head" data-act="toggleRound" data-id="${it.id}">
           <span class="rc-room">${esc(it.room)}</span>
