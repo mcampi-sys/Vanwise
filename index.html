@@ -3884,6 +3884,7 @@ VW.consult.tipLocations = ['SVC', 'Cavo-atrial junction', 'Right atrium (fluoro-
     schedule: [],
     lib: { meds: [], devices: [], videos: null, resources: null },
     flags: [],
+    nurses: [],
     rounds: []
   };
 
@@ -3981,6 +3982,10 @@ VW.consult.tipLocations = ['SVC', 'Cavo-atrial junction', 'Right atrium (fluoro-
     return ((sh.cartLoads) || []).reduce((a, l) => a + ((l.end || Date.now()) - l.start), 0);
   }
   function onCartLoad(sh) { return ((sh.cartLoads) || []).some(l => !l.end); }
+
+  /* per-room patient-research timer: how long he spent in the chart for one room */
+  function researchMs(it) { return ((it.research) || []).reduce((a, s) => a + ((s.end || Date.now()) - s.start), 0); }
+  function researchOpen(it) { return ((it.research) || []).find(s => !s.end); }
   function workedMs(sh) {
     if (!sh) return 0;
     const end = sh.clockOut || Date.now();
@@ -5224,7 +5229,8 @@ VW.consult.tipLocations = ['SVC', 'Cavo-atrial junction', 'Right atrium (fluoro-
 
     /* the rooms still to check */
     const rs = roundStats();
-    const toCheck = (S.rounds || []).filter(x => x.status !== 'done');
+    const toCheck = (S.rounds || []).filter(x => x.status !== 'done')
+      .sort((a, b) => (b.stat ? 1 : 0) - (a.stat ? 1 : 0));
     if (rs.total) {
       html += `<div class="section-label">Rooms to check — ${rs.done} of ${rs.total}</div>`;
       if (toCheck.length) {
@@ -5395,13 +5401,15 @@ VW.consult.tipLocations = ['SVC', 'Cavo-atrial junction', 'Right atrium (fluoro-
       for (const d of ROUND_DEVICES) { if (d.re.test(line)) { device = d.id; matched = d.re; break; } }
       const dueRe = /\bchange[ds]?\b|\bchg\b|\breplace[ds]?\b|\bdue\b/i;
       const due = dueRe.test(rest) ? 'change' : 'check';
+      const statRe = /\bstat\b/i;
+      const stat = statRe.test(rest);
       // the detail line should carry what the device badge and the due badge do not
       let note = rest;
       if (matched) note = note.replace(new RegExp(matched.source, 'gi'), ' ');
-      note = note.replace(new RegExp(dueRe.source, 'gi'), ' ').replace(/\s+/g, ' ').trim();
+      note = note.replace(new RegExp(dueRe.source, 'gi'), ' ').replace(new RegExp(statRe.source, 'gi'), ' ').replace(/\s+/g, ' ').trim();
       out.push({
         id: uid(), room: room, device: device, due: due,
-        note: note, status: 'pending', changed: false, at: null
+        note: note, status: 'pending', changed: false, at: null, stat: stat
       });
     });
     return out;
@@ -5438,6 +5446,9 @@ VW.consult.tipLocations = ['SVC', 'Cavo-atrial junction', 'Right atrium (fluoro-
     item.status = 'done';
     item.changed = !!changed;
     item.at = Date.now();
+    /* close any open research session, the same way cart loads close at clock-out */
+    const rms = researchMs(item);
+    (item.research || []).forEach(s => { if (!s.end) s.end = item.at; });
     /* stay open on the measurement block so exposed / circumference can go in now */
     roundOpen = item.id;
     // file it in the shift so the counters and productivity move with it
@@ -5451,7 +5462,8 @@ VW.consult.tipLocations = ['SVC', 'Cavo-atrial junction', 'Right atrium (fluoro-
         intact: !!(item.fields || {}).intact,
         bloodReturn: !!(item.fields || {}).bloodReturn,
         flushed: !!(item.fields || {}).flushed,
-        note: item.note || '', fromRounds: true
+        note: item.note || '', fromRounds: true,
+        researchMs: rms
       };
       sh.events.push(ev);
       sh.events.sort((a, b) => a.at - b.at);
@@ -5479,6 +5491,12 @@ VW.consult.tipLocations = ['SVC', 'Cavo-atrial junction', 'Right atrium (fluoro-
     const dev = VW.opts.devices.find(d => d.id === it.device);
     const open = roundOpen === it.id;
     const f = it.fields || {};
+    const rms = researchMs(it);
+    const ropen = researchOpen(it);
+    const statBtn = `<button class="btn btn-sm btn-ghost" data-act="statRound" data-id="${it.id}">${it.stat ? 'Unmark STAT' : 'STAT'}</button>`;
+    const researchBtn = ropen
+      ? `<button class="btn btn-sm btn-gold" data-act="researchRound" data-id="${it.id}">Researching <span data-research-live="${it.id}">${fmtDur(Date.now() - ropen.start)}</span></button>`
+      : `<button class="btn btn-sm btn-ghost" data-act="researchRound" data-id="${it.id}">${rms > 60000 ? 'Research · ' + fmtDur(rms) : 'Research pt'}</button>`;
     /* the measurement and assessment block — identical whether the room is
        still to do or already ticked off, so the numbers can always be entered */
     const fieldBlock = done => `<div class="field" style="margin-bottom:10px"><label class="field-label">Device</label>
@@ -5504,6 +5522,7 @@ VW.consult.tipLocations = ['SVC', 'Cavo-atrial junction', 'Right atrium (fluoro-
           <button class="btn btn-sm btn-ghost" data-act="editRound" data-id="${it.id}">Edit room</button>
           <button class="btn btn-primary" data-act="doneRound" data-id="${it.id}">Checked</button>
           <button class="btn btn-gold" data-act="changedRound" data-id="${it.id}">Changed</button>
+          ${statBtn}${researchBtn}
         </div>`}`;
 
     if (it.status === 'done') {
@@ -5512,7 +5531,7 @@ VW.consult.tipLocations = ['SVC', 'Cavo-atrial junction', 'Right atrium (fluoro-
         <button class="rc-head" data-act="toggleRound" data-id="${it.id}">
           <span class="rc-room">${esc(it.room)}</span>
           <span class="rc-meta">${esc(dev ? dev.label : '')} · ${it.changed ? 'changed' : 'checked'} ${fmtClock(it.at)}${it.exposure ? ' · exp ' + esc(it.exposure) : ''}${it.circ ? ' · circ ' + esc(it.circ) : ''}</span>
-          ${missing ? '<span class="badge badge-gold rc-badge">add cm</span>' : ''}
+          ${(it.stat || missing) ? `<span class="rc-badge" style="display:flex;gap:6px">${it.stat ? '<span class="badge badge-stat">STAT</span>' : ''}${missing ? '<span class="badge badge-gold">add cm</span>' : ''}</span>` : ''}
           <span class="rc-tick">${I.ok}</span>
         </button>
         ${open ? `<div class="rc-body">${fieldBlock(true)}</div>` : ''}
@@ -5521,14 +5540,15 @@ VW.consult.tipLocations = ['SVC', 'Cavo-atrial junction', 'Right atrium (fluoro-
     return `<div class="round-card${open ? ' is-open' : ''}" data-round="${it.id}">
       <button class="rc-head" data-act="toggleRound" data-id="${it.id}">
         <span class="rc-room">${esc(it.room)}</span>
-        <span class="rc-meta">${esc(dev ? dev.label : 'tap to set device')}${it.note ? ' · ' + esc(it.note) : ''}</span>
-        ${it.due === 'change' ? '<span class="badge badge-gold rc-badge">change due</span>' : ''}
+        <span class="rc-meta">${esc(dev ? dev.label : 'tap to set device')}${it.note ? ' · ' + esc(it.note) : ''}${rms > 60000 ? ' · research ' + fmtDur(rms) : ''}</span>
+        ${(it.stat || it.due === 'change') ? `<span class="rc-badge" style="display:flex;gap:6px">${it.stat ? '<span class="badge badge-stat">STAT</span>' : ''}${it.due === 'change' ? '<span class="badge badge-gold">change due</span>' : ''}</span>` : ''}
         <span class="rc-caret">${I.chev}</span>
       </button>
       ${open ? `<div class="rc-body">${fieldBlock(false)}</div>`
       : `<div class="rc-quick">
         <button class="btn btn-sm btn-primary" data-act="doneRound" data-id="${it.id}">Checked</button>
         <button class="btn btn-sm btn-gold" data-act="changedRound" data-id="${it.id}">Changed</button>
+        ${statBtn}${researchBtn}
       </div>`}
     </div>`;
   }
@@ -5578,7 +5598,7 @@ VW.consult.tipLocations = ['SVC', 'Cavo-atrial junction', 'Right atrium (fluoro-
           device: CHECK_DEVICES.indexOf(x.device) >= 0 ? x.device : null,
           due: x.due === 'change' ? 'change' : 'check',
           note: String(x.note || ''), status: 'pending',
-          changed: false, at: null, eventId: null
+          changed: false, at: null, eventId: null, stat: !!x.stat
         });
         added++;
       });
@@ -5602,6 +5622,8 @@ VW.consult.tipLocations = ['SVC', 'Cavo-atrial junction', 'Right atrium (fluoro-
           ${devChips('rDevice', CHECK_DEVICES, it.device || null)}</div>
         <div class="field"><label class="field-label">What is due</label>
           ${chipGroup('rDue', [{ v: 'check', l: 'Check' }, { v: 'change', l: 'Change due' }], it.due || 'check', false)}</div>
+        <div class="field"><label class="field-label">Priority</label>
+          ${chipGroup('rStat', [{ v: 'stat', l: 'STAT' }, { v: 'routine', l: 'Routine' }], it.stat ? 'stat' : 'routine', false)}</div>
         <div class="field"><label for="rNote">Note</label>
           <input type="text" id="rNote" value="${esc(it.note || '')}" placeholder="Optional"></div>`,
       confirm: existing ? 'Save' : 'Add',
@@ -5618,7 +5640,9 @@ VW.consult.tipLocations = ['SVC', 'Cavo-atrial junction', 'Right atrium (fluoro-
           status: existing ? existing.status : 'pending',
           changed: existing ? existing.changed : false,
           at: existing ? existing.at : null,
-          eventId: existing ? existing.eventId : null
+          eventId: existing ? existing.eventId : null,
+          stat: chipValue(root, 'rStat') === 'stat',
+          research: existing ? (existing.research || []) : []
         };
         if (existing) { const i = S.rounds.findIndex(x => x.id === existing.id); if (i >= 0) S.rounds[i] = rec; }
         else S.rounds.push(rec);
@@ -5842,7 +5866,8 @@ VW.consult.tipLocations = ['SVC', 'Cavo-atrial junction', 'Right atrium (fluoro-
         <button class="btn btn-ghost btn-sm" data-act="clearRounds" style="margin-left:auto">Clear list</button>
       </div>`;
 
-      const pending = r.filter(x => x.status !== 'done');
+      const pending = r.filter(x => x.status !== 'done')
+        .sort((a, b) => (b.stat ? 1 : 0) - (a.stat ? 1 : 0));
       const done = r.filter(x => x.status === 'done').sort((a, b) => b.at - a.at);
       if (pending.length) {
         html += `<div class="section-label">To do — ${pending.length}</div><div class="round-grid">` + pending.map(roundRow).join('') + `</div>`;
@@ -6425,6 +6450,7 @@ ICU-3 CVC dressing change
     reference: { title: 'Reference', blurb: 'Devices, vein map, policies, videos, resources', icon: 'ref',    tone: '' },
     factors:   { title: 'What matters', blurb: 'The checks that change your plan, and why', icon: 'brain',  tone: 'tone-green' },
     notes:     { title: 'Shift notes', blurb: 'Timestamped notes for this shift',           icon: 'note',   tone: '' },
+    nurses:    { title: 'Nurse list', blurb: 'Sweet ones and problematic ones',             icon: 'note',   tone: 'tone-green' },
     calendar:  { title: 'Calendar',  blurb: 'Schedule shifts, see what you worked',          icon: 'shift',  tone: '' },
     crew:      { title: "Who's working", blurb: 'See your crew for each scheduled day', icon: 'shift', tone: 'tone-green' },
     history:   { title: 'History',   blurb: 'Open a past shift and review everything',       icon: 'log',    tone: '' },
@@ -6438,6 +6464,7 @@ ICU-3 CVC dressing change
       <h1 class="view-title">What matters</h1>
       <div class="view-sub">The checks that change your plan, and the reasoning behind each one</div>` + refFactors();
     if (sub.more === 'notes') return `<div class="backbar"><button data-submore="home">${I.back} More</button></div>` + viewNotes();
+    if (sub.more === 'nurses') return `<div class="backbar"><button data-submore="home">${I.back} More</button></div>` + viewNurses();
     if (sub.more === 'calendar') return viewCalendar();
     if (sub.more === 'crew') return viewCrew();
     if (sub.more === 'history') return viewHistory();
@@ -6780,6 +6807,58 @@ ICU-3 CVC dressing change
     html += S.flags.map(f => `<div class="list-row"><div class="grow"><b>${esc(f.label)}</b><span>${fmtDate(f.date)}${f.note ? ' · ' + esc(f.note) : ''}</span></div>
       <button class="icon-btn" data-act="delFlag" data-id="${esc(f.id)}" aria-label="Remove">${I.trash}</button></div>`).join('');
     return html;
+  }
+
+  /* Miguel's own nurse directory: the sweet ones and the problematic ones */
+  function viewNurses() {
+    const all = S.nurses || [];
+    const sweet = all.filter(n => n.kind !== 'problematic');
+    const prob = all.filter(n => n.kind === 'problematic');
+    let html = `<h1 class="view-title">Nurse list</h1>
+      <div class="view-sub">Your own reference — who is great to work with, and who to watch for</div>
+      <button class="btn btn-primary btn-block" data-act="addNurse" style="min-height:60px;font-size:17px;margin-bottom:16px">${I.plus} Add a nurse</button>`;
+    const row = n => `<div class="list-row"><div class="grow"><b>${esc(n.name)}</b>${n.note ? `<span>${esc(n.note)}</span>` : ''}</div>
+      <button class="icon-btn" data-act="editNurse" data-id="${esc(n.id)}" aria-label="Edit">${I.wrench}</button>
+      <button class="icon-btn" data-act="delNurse" data-id="${esc(n.id)}" aria-label="Remove">${I.trash}</button></div>`;
+    html += `<div class="section-label">Sweet — ${sweet.length}</div>`;
+    html += sweet.length ? `<div class="list">` + sweet.map(row).join('') + `</div>`
+      : `<div class="empty"><b>No sweet ones yet</b>Add the nurses who make your shift better.</div>`;
+    html += `<div class="section-label" style="margin-top:18px">Problematic — ${prob.length}</div>`;
+    html += prob.length ? `<div class="list">` + prob.map(row).join('') + `</div>`
+      : `<div class="empty"><b>Nobody flagged</b>Add the ones to watch for, with a note about why.</div>`;
+    html += `<div class="disclaimer">Stays on this device only — same as everything else in Veinwise.</div>`;
+    return html;
+  }
+
+  function openNurseEditor(existing) {
+    const n = existing || { kind: 'sweet' };
+    openSheet({
+      title: existing ? 'Edit nurse' : 'Add a nurse',
+      body: `<div class="field"><label for="nurseName">Name</label>
+          <input type="text" id="nurseName" value="${esc(n.name || '')}" placeholder="First name is enough" autocomplete="off"></div>
+        <div class="field"><label class="field-label">List</label>
+          ${chipGroup('nurseKind', [{ v: 'sweet', l: 'Sweet' }, { v: 'problematic', l: 'Problematic' }], n.kind === 'problematic' ? 'problematic' : 'sweet', false)}</div>
+        <div class="field"><label for="nurseNote">Note</label>
+          <input type="text" id="nurseNote" value="${esc(n.note || '')}" placeholder="Unit, why they are on this list…"></div>`,
+      confirm: existing ? 'Save' : 'Add',
+      danger: existing ? 'Remove' : null,
+      onDanger: () => { S.nurses = (S.nurses || []).filter(x => x.id !== existing.id); save(true); toast('Removed'); render(); },
+      onConfirm: () => {
+        const root = $('.sheet', sheetStack[sheetStack.length - 1]);
+        const name = (($('#nurseName', root) || {}).value || '').trim();
+        if (!name) { toast('Name is required'); return false; }
+        const rec = {
+          id: existing ? existing.id : uid(),
+          name: name,
+          kind: chipValue(root, 'nurseKind') === 'problematic' ? 'problematic' : 'sweet',
+          note: (($('#nurseNote', root) || {}).value || '').trim()
+        };
+        S.nurses = S.nurses || [];
+        if (existing) { const i = S.nurses.findIndex(x => x.id === existing.id); if (i >= 0) S.nurses[i] = rec; }
+        else S.nurses.push(rec);
+        save(true); toast('Saved'); render();
+      }
+    });
   }
 
   function viewSettings() {
@@ -7224,6 +7303,7 @@ ICU-3 CVC dressing change
             ev.exposure = item.exposure || '';
             ev.circ = item.circ || '';
             ev.note = item.note || '';
+            ev.researchMs = researchMs(item);
             const fl = item.fields || {};
             ev.intact = !!fl.intact; ev.bloodReturn = !!fl.bloodReturn; ev.flushed = !!fl.flushed;
           }
@@ -7236,6 +7316,29 @@ ICU-3 CVC dressing change
         if (roundOpen && roundOpen !== id) harvestRoundCard(roundOpen);
         roundOpen = (roundOpen === id) ? null : id;
         save(); render();
+        break;
+      }
+      case 'statRound': {
+        harvestRoundCard(id);
+        const item = (S.rounds || []).find(x => x.id === id);
+        if (item) { item.stat = !item.stat; toast(item.stat ? 'Marked STAT — bumped to the top' : 'Back to routine'); }
+        save(true); render(); break;
+      }
+      case 'researchRound': {
+        harvestRoundCard(id);
+        const item = (S.rounds || []).find(x => x.id === id);
+        if (item) {
+          item.research = item.research || [];
+          const open = item.research.find(s => !s.end);
+          if (open) {
+            open.end = Date.now();
+            toast('Research logged — ' + fmtDur(open.end - open.start) + ' on ' + item.room);
+          } else {
+            item.research.push({ start: Date.now() });
+            toast('Researching ' + item.room + ' — tap again when done');
+          }
+          save(true); render();
+        }
         break;
       }
       case 'clearRounds':
@@ -7324,6 +7427,9 @@ ICU-3 CVC dressing change
       case 'addResource': openLinkEditor('resource'); break;
       case 'delResource': S.lib.resources = resources().filter(r => r.id !== id); save(true); render(); break;
       case 'delFlag': S.flags = S.flags.filter(f => f.id !== id); save(true); render(); break;
+      case 'addNurse': openNurseEditor(); break;
+      case 'editNurse': openNurseEditor((S.nurses || []).find(x => x.id === id)); break;
+      case 'delNurse': S.nurses = (S.nurses || []).filter(x => x.id !== id); save(true); render(); break;
       case 'export': exportBlob(); break;
       case 'copyExport': copyText(JSON.stringify(S, null, 2)); break;
       case 'pasteImport':
@@ -7525,6 +7631,12 @@ ICU-3 CVC dressing change
       const pill = $('#shiftPill');
       if (pill) pill.textContent = fmtDur(workedMs(sh));
     }
+    /* live elapsed on any running patient-research timer */
+    document.querySelectorAll('[data-research-live]').forEach(el => {
+      const item = (S.rounds || []).find(x => x.id === el.getAttribute('data-research-live'));
+      const s = item && researchOpen(item);
+      if (s) el.textContent = fmtDur(Date.now() - s.start);
+    });
     checkReminders();
   }
 
