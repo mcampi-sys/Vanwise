@@ -1,37 +1,35 @@
 {
-  "batch": "b1790398268753",
-  "pushed_at": "2026-09-26T00:51:08-0400",
-  "note": "Test batch from Miguel \u2014 5 dictated rooms (2026-09-25 night shift)",
+  "batch": "b1790438734002",
   "rooms": [
     {
-      "room": "4135",
+      "room": "6153",
+      "device": "cvc",
+      "due": "check",
+      "note": "CVC"
+    },
+    {
+      "room": "7212",
+      "device": "picc",
+      "due": "check",
+      "note": "PICC"
+    },
+    {
+      "room": "7256",
       "device": "apheresis",
       "due": "check",
-      "note": "tunnel dialysis right"
+      "note": "tunneled dialysis, right"
     },
     {
-      "room": "4163",
-      "device": "port",
+      "room": "7263",
+      "device": "picc",
       "due": "check",
-      "note": "IVAD right"
+      "note": "PICC, left"
     },
     {
-      "room": "4165",
-      "device": "port",
-      "due": "check",
-      "note": "IVAD right"
-    },
-    {
-      "room": "5203",
-      "device": "midline",
-      "due": "check",
-      "note": "midline right"
-    },
-    {
-      "room": "5206",
+      "room": "7131",
       "device": "apheresis",
       "due": "check",
-      "note": "tunnel dialysis right"
+      "note": "hemodialysis, right"
     }
   ]
 }
