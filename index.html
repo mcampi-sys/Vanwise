@@ -5530,6 +5530,45 @@ VW.consult.tipLocations = ['SVC', 'Cavo-atrial junction', 'Right atrium (fluoro-
     });
   }
 
+  /* pull rooms Blaid pushed to pending-rounds.json in the repo */
+  function pullPendingRounds(manual) {
+    let ctl = null;
+    try { ctl = new AbortController(); } catch (e) { ctl = null; }
+    const timer = setTimeout(() => { try { if (ctl) ctl.abort(); } catch (e) {} }, 9000);
+    const opts = { cache: 'no-store' };
+    if (ctl) opts.signal = ctl.signal;
+    fetch('pending-rounds.json?v=' + Date.now(), opts).then(r => {
+      clearTimeout(timer);
+      if (!r.ok) throw new Error('http ' + r.status);
+      return r.json();
+    }).then(data => {
+      const batch = data && data.batch;
+      if (!batch || batch === S.lastRoundsBatch) { if (manual) toast('No new rooms waiting'); return; }
+      S.rounds = S.rounds || [];
+      let added = 0;
+      (data.rooms || []).forEach(x => {
+        const room = String((x && x.room) || '').trim();
+        if (!room) return;
+        if (S.rounds.some(e => String(e.room).toLowerCase() === room.toLowerCase() && e.status !== 'done')) return;
+        S.rounds.push({
+          id: uid(), room: room,
+          device: CHECK_DEVICES.indexOf(x.device) >= 0 ? x.device : null,
+          due: x.due === 'change' ? 'change' : 'check',
+          note: String(x.note || ''), status: 'pending',
+          changed: false, at: null, eventId: null
+        });
+        added++;
+      });
+      S.lastRoundsBatch = batch;
+      save(true); render();
+      if (added) toast(added + ' room' + (added === 1 ? '' : 's') + ' pulled into your checks');
+      else if (manual) toast('List was already up to date');
+    }).catch(() => {
+      clearTimeout(timer);
+      if (manual) toast('Could not reach the server — check signal');
+    });
+  }
+
   function openRoundEditor(existing) {
     const it = existing || {};
     openSheet({
@@ -5775,6 +5814,7 @@ VW.consult.tipLocations = ['SVC', 'Cavo-atrial junction', 'Right atrium (fluoro-
       </div>`;
       html += `<div class="btn-row" style="margin:14px 0">
         <button class="btn btn-ghost btn-sm" data-act="pasteRounds">${I.plus} Paste more</button>
+        <button class="btn btn-ghost btn-sm" data-act="pullRounds">Pull rooms</button>
         <button class="btn btn-ghost btn-sm" data-act="addRound">Add one</button>
         <button class="btn btn-ghost btn-sm" data-act="clearRounds" style="margin-left:auto">Clear list</button>
       </div>`;
@@ -7146,6 +7186,7 @@ ICU-3 CVC dressing change
       case 'compatRemove': compatSel = compatSel.filter(x => x !== act.dataset.name); render(); break;
       case 'compatClear': compatSel = []; render(); break;
       case 'pasteRounds': openRoundsPaste(); break;
+      case 'pullRounds': pullPendingRounds(true); break;
       case 'addRound': openRoundEditor(); break;
       case 'editRound': openRoundEditor((S.rounds || []).find(x => x.id === id)); break;
       case 'doneRound': completeRound(id, false); break;
@@ -7470,6 +7511,7 @@ ICU-3 CVC dressing change
     buildFrame();
     applyTheme();                  /* again: the topbar button exists now */
     render();
+    pullPendingRounds(false);      /* rooms Blaid pushed while you were away */
     setupSwipe();
     setupBack();
     if (window.matchMedia) {
