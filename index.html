@@ -3891,9 +3891,10 @@ VW.consult.tipLocations = ['SVC', 'Cavo-atrial junction', 'Right atrium (fluoro-
   }
 
   /* official schedule import: Miguel's shifts, seeded once */
-  const ROSTER_V = 3;
+  const ROSTER_V = 4;
   const MIGUEL_DATES = ["2026-09-22", "2026-09-24", "2026-09-25", "2026-09-27", "2026-09-28", "2026-09-30", "2026-10-05", "2026-10-06", "2026-10-07", "2026-10-11", "2026-10-12", "2026-10-14", "2026-10-20", "2026-10-22", "2026-10-23", "2026-10-25", "2026-10-26", "2026-10-28", "2026-11-03", "2026-11-05", "2026-11-06", "2026-11-08", "2026-11-09", "2026-11-11"];
-  const MIGUEL_PICKUPS = [{ date: '2026-10-16', type: 'Day shift', start: '07:00', end: '19:00', note: 'pickup' }];
+  const MIGUEL_PICKUPS = [{ date: '2026-10-16', type: 'Day shift', start: '07:00', end: '19:00', note: 'pickup' },
+                          { date: '2026-09-26', type: 'Mid shift', start: '11:00', end: '23:30', note: 'pickup' }];
   (function importRoster(){
     if ((S.rosterV || 0) >= ROSTER_V) return;
     MIGUEL_DATES.forEach(d => {
