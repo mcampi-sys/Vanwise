@@ -1,35 +1,11 @@
 {
-  "batch": "b1790438734002",
+  "batch": "b1790438766542",
   "rooms": [
     {
-      "room": "6153",
+      "room": "6122",
       "device": "cvc",
       "due": "check",
-      "note": "CVC"
-    },
-    {
-      "room": "7212",
-      "device": "picc",
-      "due": "check",
-      "note": "PICC"
-    },
-    {
-      "room": "7256",
-      "device": "apheresis",
-      "due": "check",
-      "note": "tunneled dialysis, right"
-    },
-    {
-      "room": "7263",
-      "device": "picc",
-      "due": "check",
-      "note": "PICC, left"
-    },
-    {
-      "room": "7131",
-      "device": "apheresis",
-      "due": "check",
-      "note": "hemodialysis, right"
+      "note": "CVC, right"
     }
   ]
 }
