@@ -4418,7 +4418,8 @@ VW.consult.tipLocations = ['SVC', 'Cavo-atrial junction', 'Right atrium (fluoro-
       ${checkBox('aSecond', '2nd assessment by RN', d.secondRN)}
       ${checkBox('aEscalated', 'Escalated', d.escalated)}
       ${checkBox('aMD', 'Notified MD', d.notifiedMD)}
-      ${checkBox('aRN', 'Notified RN', d.notifiedRN)}`;
+      ${checkBox('aRN', 'Notified RN', d.notifiedRN)}
+      ${checkBox('aSafeLee', 'SafeLee report filed', d.safeLee)}`;
   }
   function readAccess(root) {
     const device = chipValue(root, 'aDevice') || 'piv';
@@ -4437,7 +4438,8 @@ VW.consult.tipLocations = ['SVC', 'Cavo-atrial junction', 'Right atrium (fluoro-
       secondRN: (($('#aSecond', root) || {}).checked) || false,
       escalated: (($('#aEscalated', root) || {}).checked) || false,
       notifiedMD: (($('#aMD', root) || {}).checked) || false,
-      notifiedRN: (($('#aRN', root) || {}).checked) || false
+      notifiedRN: (($('#aRN', root) || {}).checked) || false,
+      safeLee: (($('#aSafeLee', root) || {}).checked) || false
     };
   }
 
@@ -5030,6 +5032,7 @@ VW.consult.tipLocations = ['SVC', 'Cavo-atrial junction', 'Right atrium (fluoro-
         if (a.escalated) flags.push('escalated');
         if (a.notifiedMD) flags.push('MD notified');
         if (a.notifiedRN) flags.push('RN notified');
+        if (a.safeLee) flags.push('SafeLee filed');
         if (flags.length) bits.push(flags.join(' · '));
       }
       if (t) {
