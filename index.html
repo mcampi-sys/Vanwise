@@ -275,6 +275,7 @@ main{flex:1;min-height:0;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scro
 .hero-time{font-family:var(--font-display);font-size:46px;font-weight:600;line-height:1;margin-top:5px;font-variant-numeric:tabular-nums;}
 .hero-meta{font-size:14px;color:#B9D3E2;margin-top:8px;}
 .hero-actions{display:flex;gap:8px;margin-top:15px;position:relative;flex-wrap:wrap;}
+.hero-flags{display:flex;gap:8px;margin-top:10px;position:relative;flex-wrap:wrap;}
 
 /* ---------- Buttons ---------- */
 .btn{
@@ -5257,6 +5258,9 @@ VW.consult.tipLocations = ['SVC', 'Cavo-atrial junction', 'Right atrium (fluoro-
         <button class="btn btn-on-dark" data-act="break">${breaking ? 'End break' + (breakLeft > 0 ? ' (' + fmtDur(breakLeft) + ' left)' : '') : 'Break'}</button>
         <button class="btn btn-on-dark" data-act="clockOut">Clock out</button>
       </div>
+      <div class="hero-flags">
+        <button class="btn btn-on-dark btn-sm${sh.noConsultOnBoard ? ' btn-gold' : ''}" data-act="toggleNoConsult" aria-pressed="${!!sh.noConsultOnBoard}">${sh.noConsultOnBoard ? '✓ ' : ''}No consult on board</button>
+      </div>
     </div>`;
 
     html += parkingSpot();
@@ -6706,7 +6710,7 @@ ICU-3 CVC dressing change
           <div class="counter"><b>${c.mets}</b><span>MET / Code</span></div>
         </div>
         <div class="card-flat" style="margin-top:11px;font-size:13px">
-          ${fmtClock(sh.clockIn)} – ${sh.clockOut ? fmtClock(sh.clockOut) : 'open'} · ${fmtDur(workedMs(sh))} worked${breakMs(sh) > 60000 ? ' · ' + fmtDur(breakMs(sh)) + ' break' : ''}${cartLoadMs(sh) > 60000 ? ' · ' + fmtDur(cartLoadMs(sh)) + ' cart loading' : ''}${officeTimeMs(sh) > 60000 ? ' · ' + fmtDur(officeTimeMs(sh)) + ' office time' : ''}<br>
+          ${fmtClock(sh.clockIn)} – ${sh.clockOut ? fmtClock(sh.clockOut) : 'open'} · ${fmtDur(workedMs(sh))} worked${breakMs(sh) > 60000 ? ' · ' + fmtDur(breakMs(sh)) + ' break' : ''}${cartLoadMs(sh) > 60000 ? ' · ' + fmtDur(cartLoadMs(sh)) + ' cart loading' : ''}${officeTimeMs(sh) > 60000 ? ' · ' + fmtDur(officeTimeMs(sh)) + ' office time' : ''}${sh.noConsultOnBoard ? ' · no consult on board' : ''}<br>
           <span class="muted">${c.stats} STAT · ${c.unsuccessful} unsuccessful · ${st.index != null ? st.index + '% of pace' : ''}</span>
         </div>
         <div class="section-label">Grade</div>
@@ -6747,6 +6751,7 @@ ICU-3 CVC dressing change
       lines.push('', 'OFFICE TIME');
       _off.forEach(o => lines.push(fmtClock(o.start) + ' – ' + (o.end ? fmtClock(o.end) : 'open') + '  (' + fmtDur((o.end || Date.now()) - o.start) + ')'));
     }
+    if (sh.noConsultOnBoard) lines.push('', 'BOARD', 'No consult on board at shift end');
     const g = gradeOf(sh);
     if (g.letter) {
       lines.push('', 'GRADE  ' + g.letter + '  ' + g.score + '/100  (' + VW.grade.letterName[g.letter] + ')');
@@ -6772,7 +6777,7 @@ ICU-3 CVC dressing change
     const unsucc = consults.filter(e => (e.access || e.piv || {}).unsuccessful).length;
     const who = [S.profile.name, S.profile.facility].filter(Boolean).map(esc).join(', ');
     const brk = breakMs(sh);
-    const hours = `${fmtClock(sh.clockIn)} to ${sh.clockOut ? fmtClock(sh.clockOut) : 'still open'}, ${fmtDur(workedMs(sh))} worked${brk > 60000 ? ', ' + fmtDur(brk) + ' on break' : ''}`;
+    const hours = `${fmtClock(sh.clockIn)} to ${sh.clockOut ? fmtClock(sh.clockOut) : 'still open'}, ${fmtDur(workedMs(sh))} worked${brk > 60000 ? ', ' + fmtDur(brk) + ' on break' : ''}${sh.noConsultOnBoard ? ', no consult on board' : ''}`;
     const ctype = e => { const t = VW.consult.types.find(x => x.id === e.ctype); return t ? t.label : 'Consult'; };
     const consultRows = consults.map(e => {
       const pg = VW.grade.consult(e);
@@ -7454,6 +7459,13 @@ ICU-3 CVC dressing change
       case 'break': toggleBreak(); break;
       case 'cartLoad': toggleCartLoad(); break;
       case 'officeTime': toggleOfficeTime(); break;
+      case 'toggleNoConsult': {
+        const sh = cur(); if (!sh) break;
+        sh.noConsultOnBoard = !sh.noConsultOnBoard;
+        toast(sh.noConsultOnBoard ? 'Board marked clear — no consult on board' : 'Board status cleared');
+        save(true); render();
+        break;
+      }
       case 'newConsult': if (requireShift()) openConsult(); break;
       case 'finishConsult': finishConsult(id); break;
       case 'enterRoom': enterRoom(id); break;
