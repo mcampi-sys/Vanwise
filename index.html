@@ -3983,7 +3983,7 @@ VW.consult.tipLocations = ['SVC', 'Cavo-atrial junction', 'Right atrium (fluoro-
   /* ---------------- shift engine ---------------- */
   function newShift() {
     const now = Date.now();
-    return { id: uid(), date: dateKey(now), clockIn: now, clockOut: null, breaks: [], cartLoads: [], events: [], notes: [], summary: '', nextReminder: now + S.settings.reminderMins * 60000 };
+    return { id: uid(), date: dateKey(now), clockIn: now, clockOut: null, breaks: [], cartLoads: [], officeTimes: [], events: [], notes: [], summary: '', nextReminder: now + S.settings.reminderMins * 60000 };
   }
   function cur() { return S.current; }
   function breakMs(sh) {
@@ -3994,6 +3994,10 @@ VW.consult.tipLocations = ['SVC', 'Cavo-atrial junction', 'Right atrium (fluoro-
     return ((sh.cartLoads) || []).reduce((a, l) => a + ((l.end || Date.now()) - l.start), 0);
   }
   function onCartLoad(sh) { return ((sh.cartLoads) || []).some(l => !l.end); }
+  function officeTimeMs(sh) {
+    return ((sh.officeTimes) || []).reduce((a, o) => a + ((o.end || Date.now()) - o.start), 0);
+  }
+  function onOfficeTime(sh) { return ((sh.officeTimes) || []).some(o => !o.end); }
 
   /* per-room patient-research timer: how long he spent in the chart for one room */
   function researchMs(it) { return ((it.research) || []).reduce((a, s) => a + ((s.end || Date.now()) - s.start), 0); }
@@ -4150,6 +4154,8 @@ VW.consult.tipLocations = ['SVC', 'Cavo-atrial junction', 'Right atrium (fluoro-
         S.settings.pdfOnOut = wantPdf;
         (sh.breaks || []).forEach(b => { if (!b.end) b.end = Date.now(); });
         (sh.cartLoads || []).forEach(l => { if (!l.end) l.end = Date.now(); });
+        (sh.officeTimes || []).forEach(o => { if (!o.end) o.end = Date.now(); });
+        (sh.events || []).forEach(e => (e.research || []).forEach(s => { if (!s.end) s.end = Date.now(); }));
         sh.clockOut = Date.now();
         sh.rounds = (S.rounds || []).map(x => Object.assign({}, x));
         S.shifts.unshift(sh); S.current = null;
@@ -4183,6 +4189,21 @@ VW.consult.tipLocations = ['SVC', 'Cavo-atrial junction', 'Right atrium (fluoro-
     } else {
       sh.cartLoads.push({ start: Date.now() });
       toast('Cart loading started — tap Done loading when the cart is ready');
+    }
+    save(true); render();
+  }
+
+  function toggleOfficeTime() {
+    const sh = S.current; if (!sh) return;
+    sh.officeTimes = sh.officeTimes || [];
+    const open = sh.officeTimes.filter(o => !o.end);
+    if (open.length) {
+      const now = Date.now();
+      open.forEach(o => { o.end = now; });
+      toast('Office time logged — ' + fmtDur(now - open[0].start));
+    } else {
+      sh.officeTimes.push({ start: Date.now() });
+      toast('Office time started — tap Done when you leave the office');
     }
     save(true); render();
   }
@@ -4773,6 +4794,7 @@ VW.consult.tipLocations = ['SVC', 'Cavo-atrial junction', 'Right atrium (fluoro-
     ev.at = Date.now();
     ev.finished = ev.at;
     ev.durMs = Math.max(0, ev.at - (ev.started || ev.at));
+    (ev.research || []).forEach(s => { if (!s.end) s.end = ev.at; });
     save(true);
     openConsultForm(ev.ctype || 'access', ev);
   }
@@ -5023,6 +5045,7 @@ VW.consult.tipLocations = ['SVC', 'Cavo-atrial junction', 'Right atrium (fluoro-
       const a = ev.access, t = ev.trouble, c = ev.clearing, d = ev.deaccess, dr = ev.dressing, ed = ev.education;
       if (ev.canceled) bits.push('consult canceled');
       if (ev.isolation) bits.push('isolation precautions');
+      if (researchMs(ev) > 60000) bits.push('chart read ' + fmtDur(researchMs(ev)) + ' (SB)');
       if (ev.assignedAt && ev.started && ev.started - ev.assignedAt >= 60000)
         bits.push('assigned ' + fmtClock(ev.assignedAt));
       if (a) {
@@ -5219,14 +5242,17 @@ VW.consult.tipLocations = ['SVC', 'Cavo-atrial junction', 'Right atrium (fluoro-
     const nextIn = sh.nextReminder ? sh.nextReminder - Date.now() : null;
     const openLoad = (sh.cartLoads || []).find(l => !l.end);
     const cartMs = cartLoadMs(sh);
+    const openOff = (sh.officeTimes || []).find(o => !o.end);
+    const offMs = officeTimeMs(sh);
 
     html += `<div class="hero">
       <div class="hero-top"><div style="flex:1">
         <div class="hero-label">${breaking ? 'On break' : 'On shift'}</div>
         <div class="hero-time" id="liveTimer">${fmtDurLong(workedMs(sh))}</div>
-        <div class="hero-meta">In at ${fmtClock(sh.clockIn)} · ${fmtDate(sh.date)}${breakMs(sh) > 60000 ? ' · ' + fmtDur(breakMs(sh)) + ' break' : ''}${openLoad ? ' · loading cart ' + fmtDur(Date.now() - openLoad.start) : (cartMs > 60000 ? ' · ' + fmtDur(cartMs) + ' cart loading' : '')}</div>
+        <div class="hero-meta">In at ${fmtClock(sh.clockIn)} · ${fmtDate(sh.date)}${breakMs(sh) > 60000 ? ' · ' + fmtDur(breakMs(sh)) + ' break' : ''}${openLoad ? ' · loading cart ' + fmtDur(Date.now() - openLoad.start) : (cartMs > 60000 ? ' · ' + fmtDur(cartMs) + ' cart loading' : '')}${openOff ? ' · office ' + fmtDur(Date.now() - openOff.start) : (offMs > 60000 ? ' · ' + fmtDur(offMs) + ' office time' : '')}</div>
       </div></div>
       <div class="hero-actions">
+        <button class="btn btn-on-dark" data-act="officeTime">${openOff ? 'Done (' + fmtDur(Date.now() - openOff.start) + ')' : 'Office time'}</button>
         <button class="btn btn-on-dark" data-act="cartLoad">${openLoad ? 'Done loading (' + fmtDur(Date.now() - openLoad.start) + ')' : 'Loading cart'}</button>
         <button class="btn btn-on-dark" data-act="break">${breaking ? 'End break' + (breakLeft > 0 ? ' (' + fmtDur(breakLeft) + ' left)' : '') : 'Break'}</button>
         <button class="btn btn-on-dark" data-act="clockOut">Clock out</button>
@@ -5734,6 +5760,17 @@ VW.consult.tipLocations = ['SVC', 'Cavo-atrial junction', 'Right atrium (fluoro-
     const since = inRoom
       ? `${fmtClock(ev.started)}${mins ? ' · ' + mins + ' min' : ' · just now'}`
       : `Assigned ${fmtClock(ev.assignedAt || ev.at)}`;
+    const sbOpen = researchOpen(ev);
+    const sbMs = researchMs(ev);
+    const sbBtn = sbOpen
+      ? `<button class="oc-done" data-act="sbRead" data-id="${ev.id}" style="margin-top:6px">
+          <span class="oc-box">${I.book}</span>
+          <span>Reading chart (SB) — <span data-research-live="${ev.id}">${fmtDur(Date.now() - sbOpen.start)}</span></span>
+        </button>`
+      : `<button class="oc-done" data-act="sbRead" data-id="${ev.id}" style="margin-top:6px">
+          <span class="oc-box">${I.book}</span>
+          <span>${sbMs > 60000 ? 'Chart read (SB) · ' + fmtDur(sbMs) + ' — tap for more' : 'Reading the chart (SB)'}</span>
+        </button>`;
     return `<div class="open-consult${ev.stat ? ' is-stat' : ''}${compact ? ' is-compact' : ''}" data-open-consult="${ev.id}">
       <div class="oc-top">
         ${compact ? '' : `<span class="oc-grip" data-grip="${ev.id}" aria-label="Drag to reorder">${I.grip}</span>`}
@@ -5751,6 +5788,7 @@ VW.consult.tipLocations = ['SVC', 'Cavo-atrial junction', 'Right atrium (fluoro-
         <span class="oc-box">${I.ok}</span>
         <span>Done — stamp the time</span>
       </button>
+      ${sbBtn}
       ${compact
         ? (ev.room ? '' : `<div class="oc-drop"><button data-act="editOpenRoom" data-id="${ev.id}">Add room</button></div>`)
         : `<div class="oc-drop">
@@ -6668,7 +6706,7 @@ ICU-3 CVC dressing change
           <div class="counter"><b>${c.mets}</b><span>MET / Code</span></div>
         </div>
         <div class="card-flat" style="margin-top:11px;font-size:13px">
-          ${fmtClock(sh.clockIn)} – ${sh.clockOut ? fmtClock(sh.clockOut) : 'open'} · ${fmtDur(workedMs(sh))} worked${breakMs(sh) > 60000 ? ' · ' + fmtDur(breakMs(sh)) + ' break' : ''}${cartLoadMs(sh) > 60000 ? ' · ' + fmtDur(cartLoadMs(sh)) + ' cart loading' : ''}<br>
+          ${fmtClock(sh.clockIn)} – ${sh.clockOut ? fmtClock(sh.clockOut) : 'open'} · ${fmtDur(workedMs(sh))} worked${breakMs(sh) > 60000 ? ' · ' + fmtDur(breakMs(sh)) + ' break' : ''}${cartLoadMs(sh) > 60000 ? ' · ' + fmtDur(cartLoadMs(sh)) + ' cart loading' : ''}${officeTimeMs(sh) > 60000 ? ' · ' + fmtDur(officeTimeMs(sh)) + ' office time' : ''}<br>
           <span class="muted">${c.stats} STAT · ${c.unsuccessful} unsuccessful · ${st.index != null ? st.index + '% of pace' : ''}</span>
         </div>
         <div class="section-label">Grade</div>
@@ -6703,6 +6741,11 @@ ICU-3 CVC dressing change
     if (_loads.length) {
       lines.push('', 'CART LOADING');
       _loads.forEach(l => lines.push(fmtClock(l.start) + ' – ' + (l.end ? fmtClock(l.end) : 'open') + '  (' + fmtDur((l.end || Date.now()) - l.start) + ')'));
+    }
+    const _off = sh.officeTimes || [];
+    if (_off.length) {
+      lines.push('', 'OFFICE TIME');
+      _off.forEach(o => lines.push(fmtClock(o.start) + ' – ' + (o.end ? fmtClock(o.end) : 'open') + '  (' + fmtDur((o.end || Date.now()) - o.start) + ')'));
     }
     const g = gradeOf(sh);
     if (g.letter) {
@@ -6773,6 +6816,11 @@ ICU-3 CVC dressing change
       <td class="t">${fmtClock(l.start)}<span class="vr-sub">to ${l.end ? fmtClock(l.end) : 'open'}</span></td>
       <td><b>Loading cart</b></td>
       <td class="t">${fmtDur((l.end || Date.now()) - l.start)}</td></tr>`).join('');
+    const offs = sh.officeTimes || [];
+    const offRows = offs.map(o => `<tr>
+      <td class="t">${fmtClock(o.start)}<span class="vr-sub">to ${o.end ? fmtClock(o.end) : 'open'}</span></td>
+      <td><b>Office time</b></td>
+      <td class="t">${fmtDur((o.end || Date.now()) - o.start)}</td></tr>`).join('');
     const partRows = g.letter ? g.parts.map(pt => {
       const pct = Math.max(0, Math.min(100, Math.round(pt.got / pt.max * 100)));
       return `<tr><td><b>${esc(pt.label)}</b><div class="vr-bar"><i style="width:${pct}%"></i></div></td><td>${pt.got} / ${pt.max}</td><td>${esc(pt.detail)}</td></tr>`;
@@ -6806,6 +6854,7 @@ ICU-3 CVC dressing change
       ${mets.length ? `<h2>MET / code <small>${mets.length}</small></h2><table><thead><tr><th>Time</th><th>Room</th><th>Call</th><th>Note</th></tr></thead><tbody>${metRows}</tbody></table>` : ''}
       ${rounds.length ? `<h2>Rounds list <small>${rDone} of ${rounds.length} done</small></h2><table><thead><tr><th>Room</th><th>Line</th><th>Status</th></tr></thead><tbody>${roundRows}</tbody></table>` : ''}
       ${loads.length ? `<h2>Cart loading <small>${loads.length} · ${fmtDur(loads.reduce((a, l) => a + ((l.end || Date.now()) - l.start), 0))} total</small></h2><table><thead><tr><th>Time</th><th>Task</th><th>Took</th></tr></thead><tbody>${loadRows}</tbody></table>` : ''}
+      ${offs.length ? `<h2>Office time <small>${offs.length} · ${fmtDur(offs.reduce((a, o) => a + ((o.end || Date.now()) - o.start), 0))} total</small></h2><table><thead><tr><th>Time</th><th>Task</th><th>Took</th></tr></thead><tbody>${offRows}</tbody></table>` : ''}
       ${(sh.notes || []).length ? `<h2>Shift notes</h2>` + sh.notes.map(n => `<div class="vr-note"><time>${fmtClock(n.at)}</time>${esc(n.text)}</div>`).join('') : ''}
       ${sh.summary ? `<h2>Hand-off</h2><div class="vr-note">${esc(sh.summary)}</div>` : ''}
       <footer class="vr-foot"><span>Personal record. Room numbers only, no patient identifiers.</span><span>Made ${esc(new Date().toLocaleString())} with Veinwise, Aeterna Atelier</span></footer>
@@ -7378,6 +7427,21 @@ ICU-3 CVC dressing change
         }
         break;
       }
+      case 'sbRead': {
+        const sh2 = cur(); if (!sh2) break;
+        const ev2 = sh2.events.find(x => x.id === id); if (!ev2) break;
+        ev2.research = ev2.research || [];
+        const open2 = ev2.research.find(s => !s.end);
+        if (open2) {
+          open2.end = Date.now();
+          toast('Chart read logged — ' + fmtDur(open2.end - open2.start) + ' (SB)');
+        } else {
+          ev2.research.push({ start: Date.now() });
+          toast('Reading the chart' + (ev2.room ? ' for ' + ev2.room : '') + ' — tap again when done');
+        }
+        save(true); render();
+        break;
+      }
       case 'clearRounds':
         openSheet({
           title: 'Clear the list?',
@@ -7389,6 +7453,7 @@ ICU-3 CVC dressing change
       case 'clockOut': clockOut(); break;
       case 'break': toggleBreak(); break;
       case 'cartLoad': toggleCartLoad(); break;
+      case 'officeTime': toggleOfficeTime(); break;
       case 'newConsult': if (requireShift()) openConsult(); break;
       case 'finishConsult': finishConsult(id); break;
       case 'enterRoom': enterRoom(id); break;
@@ -7727,7 +7792,9 @@ ICU-3 CVC dressing change
     }
     /* live elapsed on any running patient-research timer */
     document.querySelectorAll('[data-research-live]').forEach(el => {
-      const item = (S.rounds || []).find(x => x.id === el.getAttribute('data-research-live'));
+      const rid = el.getAttribute('data-research-live');
+      const item = (S.rounds || []).find(x => x.id === rid) ||
+        ((cur() || {}).events || []).find(x => x.id === rid);
       const s = item && researchOpen(item);
       if (s) el.textContent = fmtDur(Date.now() - s.start);
     });
