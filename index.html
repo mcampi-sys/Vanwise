@@ -926,6 +926,16 @@ pre.sample{
   padding:14px 15px;margin-bottom:10px;
 }
 .open-consult.is-stat{border-color:var(--danger);}
+.oc-grip{
+  touch-action:none;cursor:grab;flex:none;align-self:center;
+  padding:14px 8px 14px 0;margin:-14px 0;color:var(--muted);
+  display:flex;align-items:center;
+}
+.oc-grip svg{width:22px;height:22px;}
+.open-consult.is-dragging{
+  position:relative;z-index:60;box-shadow:0 12px 28px rgba(0,0,0,.22);
+  cursor:grabbing;
+}
 .oc-top{display:flex;align-items:flex-start;gap:11px;}
 .oc-ico{
   width:42px;height:42px;flex:none;border-radius:12px;background:var(--accent-soft);
@@ -3835,6 +3845,7 @@ VW.consult.tipLocations = ['SVC', 'Cavo-atrial junction', 'Right atrium (fluoro-
     more: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="5" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="19" cy="12" r="1.4"/></svg>',
     search: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>',
     chev: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"/></svg>',
+    grip: '<svg viewBox="0 0 24 24" fill="currentColor"><circle cx="9" cy="6" r="1.6"/><circle cx="15" cy="6" r="1.6"/><circle cx="9" cy="12" r="1.6"/><circle cx="15" cy="12" r="1.6"/><circle cx="9" cy="18" r="1.6"/><circle cx="15" cy="18" r="1.6"/></svg>',
     plus: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>',
     drop: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3s6 6.4 6 10.2A6 6 0 0 1 6 13.2C6 9.4 12 3 12 3z"/></svg>',
     bell: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 1 0-12 0c0 6-2 7-2 7h16s-2-1-2-7"/><path d="M13.7 20a2 2 0 0 1-3.4 0"/></svg>',
@@ -4734,7 +4745,8 @@ VW.consult.tipLocations = ['SVC', 'Cavo-atrial junction', 'Right atrium (fluoro-
     const now = Date.now();
     sh.events.push({
       id: uid(), kind: 'consult', ctype: type, pending: true,
-      assignedAt: now, started: null, at: now, stat: !!stat, isolation: !!isolation, room: room || ''
+      assignedAt: now, started: null, at: now, stat: !!stat, isolation: !!isolation, room: room || '',
+      ord: now
     });
     sh.events.sort((a, b) => a.at - b.at);
     save(true);
@@ -5215,8 +5227,7 @@ VW.consult.tipLocations = ['SVC', 'Cavo-atrial junction', 'Right atrium (fluoro-
     html += bigActions(st.c);
 
     /* what he is on right now */
-    const openNow = sh.events.filter(e => e.kind === 'consult' && e.pending)
-      .sort((a, b) => (b.stat ? 1 : 0) - (a.stat ? 1 : 0) || (a.assignedAt || a.started || a.at || 0) - (b.assignedAt || b.started || b.at || 0));
+    const openNow = sortOpenConsults(sh.events.filter(e => e.kind === 'consult' && e.pending));
     html += `<div class="section-label">On now${openNow.length ? ' — ' + openNow.length : ''}</div>`;
     if (openNow.length) {
       html += openNow.map(e => openConsultCard(e, true)).join('');
@@ -5657,11 +5668,19 @@ VW.consult.tipLocations = ['SVC', 'Cavo-atrial junction', 'Right atrium (fluoro-
 
 
   /* ---------------- Consults tab ---------------- */
+  /* manual order for open consults: STATs stay on top, drag sets the rest */
+  function consultOrd(ev) {
+    return (typeof ev.ord === 'number') ? ev.ord : 1e15;
+  }
+  function sortOpenConsults(list) {
+    return list.sort((a, b) => (b.stat ? 1 : 0) - (a.stat ? 1 : 0)
+      || consultOrd(a) - consultOrd(b)
+      || (a.assignedAt || a.started || a.at || 0) - (b.assignedAt || b.started || b.at || 0));
+  }
   function viewConsults() {
     const sh = cur();
     const all = sh ? sh.events.filter(e => e.kind === 'consult') : [];
-    const open = all.filter(e => e.pending)
-      .sort((a, b) => (b.stat ? 1 : 0) - (a.stat ? 1 : 0) || (a.assignedAt || a.started || a.at || 0) - (b.assignedAt || b.started || b.at || 0));
+    const open = sortOpenConsults(all.filter(e => e.pending));
     const list = all.filter(e => !e.pending).sort((a, b) => b.at - a.at);
     const c = sh ? counts(sh) : { consults: 0, stats: 0, unsuccessful: 0 };
     let html = `<h1 class="view-title">Consults</h1>
@@ -5705,6 +5724,7 @@ VW.consult.tipLocations = ['SVC', 'Cavo-atrial junction', 'Right atrium (fluoro-
       : `Assigned ${fmtClock(ev.assignedAt || ev.at)}`;
     return `<div class="open-consult${ev.stat ? ' is-stat' : ''}${compact ? ' is-compact' : ''}" data-open-consult="${ev.id}">
       <div class="oc-top">
+        ${compact ? '' : `<span class="oc-grip" data-grip="${ev.id}" aria-label="Drag to reorder">${I.grip}</span>`}
         <span class="oc-ico">${I[(t && t.icon) || 'consult'] || I.consult}</span>
         <div class="grow" style="min-width:0">
           <div class="oc-name">${ev.room ? esc(ev.room) : '<span class="oc-noroom">No room</span>'}${ev.stat ? ' <span class="badge badge-stat">STAT</span>' : ''}${ev.isolation ? ' <span class="badge badge-gold">Isolation</span>' : ''}</div>
@@ -7537,6 +7557,62 @@ ICU-3 CVC dressing change
       save(true);
     }
   });
+
+  /* drag-to-reorder open consults: grip handle, touch + mouse via Pointer Events.
+     STATs always stay on top; the drag sets the order inside each group. */
+  let consultDrag = null;
+  document.addEventListener('pointerdown', e => {
+    const grip = e.target.closest('[data-grip]');
+    if (!grip) return;
+    const card = grip.closest('[data-open-consult]');
+    if (!card || !card.parentElement) return;
+    e.preventDefault();
+    consultDrag = {
+      card: card,
+      list: card.parentElement,
+      pointerId: e.pointerId,
+      startY: e.clientY,
+      before: [...card.parentElement.querySelectorAll('[data-open-consult]')].map(c => c.getAttribute('data-open-consult'))
+    };
+    card.classList.add('is-dragging');
+  });
+  document.addEventListener('pointermove', e => {
+    const d = consultDrag;
+    if (!d || e.pointerId !== d.pointerId) return;
+    d.card.style.transform = 'translateY(' + (e.clientY - d.startY) + 'px)';
+    const mid = d.card.getBoundingClientRect().top + d.card.offsetHeight / 2;
+    const sibs = [...d.list.querySelectorAll('[data-open-consult]')].filter(c => c !== d.card);
+    for (const s of sibs) {
+      const r = s.getBoundingClientRect();
+      if (mid >= r.top && mid <= r.bottom) {
+        d.list.insertBefore(d.card, (mid < r.top + r.height / 2) ? s : s.nextSibling);
+        break;
+      }
+    }
+  });
+  function endConsultDrag(e) {
+    const d = consultDrag;
+    if (!d || (e && e.pointerId !== d.pointerId)) return;
+    consultDrag = null;
+    d.card.classList.remove('is-dragging');
+    d.card.style.transform = '';
+    const after = [...d.list.querySelectorAll('[data-open-consult]')].map(c => c.getAttribute('data-open-consult'));
+    if (after.join() === d.before.join()) return; /* just a tap on the grip */
+    const sh = cur();
+    if (sh && after.length) {
+      const byId = {};
+      sh.events.forEach(ev => { byId[ev.id] = ev; });
+      /* stable: STATs first, dragged relative order kept inside each group */
+      const stats = [], rest = [];
+      after.forEach(id => { const ev = byId[id]; if (ev) (ev.stat ? stats : rest).push(ev); });
+      stats.concat(rest).forEach((ev, i) => { ev.ord = i; });
+      save(true);
+      toast('Order saved');
+    }
+    render();
+  }
+  document.addEventListener('pointerup', endConsultDrag);
+  document.addEventListener('pointercancel', endConsultDrag);
 
   /* ---------------- opening sequence ----------------
      Aeterna Atelier into Veinwise. Plays on the first launch of the
