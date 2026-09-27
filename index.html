@@ -3896,7 +3896,8 @@ VW.consult.tipLocations = ['SVC', 'Cavo-atrial junction', 'Right atrium (fluoro-
     lib: { meds: [], devices: [], videos: null, resources: null },
     flags: [],
     nurses: [],
-    rounds: []
+    rounds: [],
+    parkingNote: ''
   };
 
   /* Official unit roster 2026-09-20..2026-11-14: date -> {day:{name:shift}, night:{name:shift}} */
@@ -5171,6 +5172,15 @@ VW.consult.tipLocations = ['SVC', 'Cavo-atrial junction', 'Right atrium (fluoro-
     </div>`;
   }
 
+  /* parking spot: jot-it notes on the home page so nothing slips */
+  function parkingSpot() {
+    const note = S.parkingNote || '';
+    return `<div class="card" style="margin-top:12px">
+      <div class="card-head"><h3>&#x1F17F;&#xFE0F; Parking spot</h3>${note ? `<button class="btn btn-sm btn-ghost" data-act="clearParking">Clear</button>` : `<span class="muted">jot it, don&rsquo;t forget it</span>`}</div>
+      <textarea id="parkingNote" placeholder="Room to recheck, nurse to call back, supply to grab&hellip;">${esc(note)}</textarea>
+    </div>`;
+  }
+
   function viewShift() {
     const sh = cur();
     const st = sh ? stats(sh) : null;
@@ -5190,6 +5200,7 @@ VW.consult.tipLocations = ['SVC', 'Cavo-atrial junction', 'Right atrium (fluoro-
         </div></div>
         <div class="hero-actions"><button class="btn btn-gold" data-act="clockIn">${I.shift} Clock in</button></div>
       </div>`;
+      html += parkingSpot();
       const last = S.shifts[0];
       if (last) {
         const lc = counts(last);
@@ -5222,6 +5233,7 @@ VW.consult.tipLocations = ['SVC', 'Cavo-atrial junction', 'Right atrium (fluoro-
       </div>
     </div>`;
 
+    html += parkingSpot();
     html += `<div class="shift-cols"><div>`;
 
     html += bigActions(st.c);
@@ -7311,6 +7323,7 @@ ICU-3 CVC dressing change
       }
       case 'compatRemove': compatSel = compatSel.filter(x => x !== act.dataset.name); render(); break;
       case 'compatClear': compatSel = []; render(); break;
+      case 'clearParking': S.parkingNote = ''; save(true); render(); break;
       case 'pasteRounds': openRoundsPaste(); break;
       case 'pullRounds': pullPendingRounds(true); break;
       case 'addRound': openRoundEditor(); break;
@@ -7523,6 +7536,7 @@ ICU-3 CVC dressing change
   /* live inputs */
   document.addEventListener('input', e => {
     const t = e.target;
+    if (t.id === 'parkingNote') { S.parkingNote = t.value; save(); return; }
     if (t.id === 'compatSearch') { compatSearch = t.value; const pos = t.selectionStart; render(); const n = $('#compatSearch'); if (n) { n.focus(); try { n.setSelectionRange(pos, pos); } catch (x) { } } return; }
     if (t.id === 'medSearch') { search.meds = t.value; const p = t.selectionStart; render(); const n = $('#medSearch'); if (n) { n.focus(); try { n.setSelectionRange(p, p); } catch (x) { } } return; }
     if (t.id === 'devSearch') { search.dev = t.value; const p = t.selectionStart; render(); const n = $('#devSearch'); if (n) { n.focus(); try { n.setSelectionRange(p, p); } catch (x) { } } return; }
@@ -7744,7 +7758,7 @@ ICU-3 CVC dressing change
       else if (e.key === 'ArrowLeft') shiftTab(-1);
     });
     setInterval(tick, 1000);
-    setInterval(() => { if (active === 'shift' && cur()) render(); }, 60000);
+    setInterval(() => { if (active === 'shift' && cur() && !(document.activeElement && document.activeElement.id === 'parkingNote')) render(); }, 60000);
     document.addEventListener('visibilitychange', () => { if (!document.hidden) { checkReminders(); render(); } });
     if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
       navigator.serviceWorker.register('sw.js').then(r => { swReg = r; }).catch(() => { });
