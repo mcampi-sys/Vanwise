@@ -3880,6 +3880,7 @@ VW.consult.tipLocations = ['SVC', 'Cavo-atrial junction', 'Right atrium (fluoro-
     moon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 14.2A8.4 8.4 0 0 1 9.8 4 8.4 8.4 0 1 0 20 14.2z"/></svg>',
     close: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>',
     book: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4.5A1.5 1.5 0 0 1 5.5 3H19v15H5.5A1.5 1.5 0 0 0 4 19.5z"/><path d="M4 19.5A1.5 1.5 0 0 1 5.5 18H19v3H5.5A1.5 1.5 0 0 1 4 19.5z"/><path d="M8.5 7.5h6M8.5 11h4"/></svg>',
+    clock: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.5 2"/></svg>',
     compat: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="12" r="5"/><circle cx="16" cy="12" r="5"/></svg>',
     brain: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5.5a3 3 0 0 0-5.7-1.3A2.8 2.8 0 0 0 4 9.2a3 3 0 0 0 .6 5 2.8 2.8 0 0 0 4.6 2.6A2.6 2.6 0 0 0 12 19z"/><path d="M12 5.5a3 3 0 0 1 5.7-1.3A2.8 2.8 0 0 1 20 9.2a3 3 0 0 1-.6 5 2.8 2.8 0 0 1-4.6 2.6A2.6 2.6 0 0 1 12 19z"/><path d="M12 5.5V19"/></svg>'
   };
@@ -4011,6 +4012,20 @@ VW.consult.tipLocations = ['SVC', 'Cavo-atrial junction', 'Right atrium (fluoro-
   /* per-room patient-research timer: how long he spent in the chart for one room */
   function researchMs(it) { return ((it.research) || []).reduce((a, s) => a + ((s.end || Date.now()) - s.start), 0); }
   function researchOpen(it) { return ((it.research) || []).find(s => !s.end); }
+  /* generic start/end session helpers — per-consult wait timers ride on these */
+  function sessMs(arr) { return ((arr) || []).reduce((a, s) => a + ((s.end || Date.now()) - s.start), 0); }
+  function sessOpen(arr) { return ((arr) || []).find(s => !s.end); }
+  function closeSessions(arr, at) { (arr || []).forEach(s => { if (!s.end) s.end = at; }); }
+  /* waiting timers on an open consult — justify extended case time */
+  const WAIT_TIMERS = [
+    { key: 'waitNoPt', label: 'Pt not in room', detail: 'pt not in room',
+      startToast: 'Pt not in room — tap again when they arrive', stopToast: 'Not-in-room wait logged' },
+    { key: 'waitChair', label: 'Pt in chair', detail: 'pt in chair',
+      startToast: 'Pt in chair — tap again when they are in bed', stopToast: 'In-chair wait logged' },
+    { key: 'waitTransfer', label: 'Waiting on RN transfer to bed', detail: 'waiting on RN transfer to bed',
+      startToast: 'Waiting on RN transfer — tap again when done', stopToast: 'RN-transfer wait logged' },
+  ];
+  function waitTimerKeys() { return ['research'].concat(WAIT_TIMERS.map(w => w.key)); }
   function workedMs(sh) {
     if (!sh) return 0;
     const end = sh.clockOut || Date.now();
@@ -4164,7 +4179,7 @@ VW.consult.tipLocations = ['SVC', 'Cavo-atrial junction', 'Right atrium (fluoro-
         (sh.breaks || []).forEach(b => { if (!b.end) b.end = Date.now(); });
         (sh.cartLoads || []).forEach(l => { if (!l.end) l.end = Date.now(); });
         (sh.officeTimes || []).forEach(o => { if (!o.end) o.end = Date.now(); });
-        (sh.events || []).forEach(e => (e.research || []).forEach(s => { if (!s.end) s.end = Date.now(); }));
+        (sh.events || []).forEach(e => waitTimerKeys().forEach(k => closeSessions(e[k], Date.now())));
         sh.clockOut = Date.now();
         sh.rounds = (S.rounds || []).map(x => Object.assign({}, x));
         S.shifts.unshift(sh); S.current = null;
@@ -4855,7 +4870,7 @@ VW.consult.tipLocations = ['SVC', 'Cavo-atrial junction', 'Right atrium (fluoro-
     ev.at = Date.now();
     ev.finished = ev.at;
     ev.durMs = Math.max(0, ev.at - (ev.started || ev.at));
-    (ev.research || []).forEach(s => { if (!s.end) s.end = ev.at; });
+    waitTimerKeys().forEach(k => closeSessions(ev[k], ev.at));
     save(true);
     openConsultForm(ev.ctype || 'access', ev);
     askRestockCart();
@@ -5123,6 +5138,7 @@ VW.consult.tipLocations = ['SVC', 'Cavo-atrial junction', 'Right atrium (fluoro-
       if (ev.canceled) bits.push('consult canceled');
       if (ev.isolation) bits.push('isolation precautions');
       if (researchMs(ev) > 60000) bits.push('chart read ' + fmtDur(researchMs(ev)) + ' (SB)');
+      WAIT_TIMERS.forEach(w => { const wms = sessMs(ev[w.key]); if (wms > 60000) bits.push(w.detail + ' ' + fmtDur(wms)); });
       if (ev.assignedAt && ev.started && ev.started - ev.assignedAt >= 60000)
         bits.push('assigned ' + fmtClock(ev.assignedAt));
       if (a) {
@@ -5876,6 +5892,33 @@ VW.consult.tipLocations = ['SVC', 'Cavo-atrial junction', 'Right atrium (fluoro-
     return html;
   }
 
+  /* one waiting-timer button for an open consult card */
+  function waitTimerBtn(ev, w) {
+    const open = sessOpen(ev[w.key]);
+    const ms = sessMs(ev[w.key]);
+    const inner = open
+      ? `${w.label} — <span data-wait-live="${ev.id}:${w.key}">${fmtDur(Date.now() - open.start)}</span>`
+      : (ms > 60000 ? `${w.label} · ${fmtDur(ms)} — tap for more` : w.label);
+    return `<button class="oc-done" data-act="${w.key}" data-id="${ev.id}" style="margin-top:6px">
+      <span class="oc-box">${I.clock}</span>
+      <span>${inner}</span>
+    </button>`;
+  }
+  function toggleWaitTimer(id, key) {
+    const w = WAIT_TIMERS.find(x => x.key === key); if (!w) return;
+    const sh2 = cur(); if (!sh2) return;
+    const ev2 = sh2.events.find(x => x.id === id); if (!ev2) return;
+    ev2[key] = ev2[key] || [];
+    const open2 = ev2[key].find(s => !s.end);
+    if (open2) {
+      open2.end = Date.now();
+      toast(w.stopToast + ' — ' + fmtDur(open2.end - open2.start));
+    } else {
+      ev2[key].push({ start: Date.now() });
+      toast(w.startToast);
+    }
+    save(true); render();
+  }
   /* an open consult: the type is banked, the clock is running, details come after the tick */
   function openConsultCard(ev, compact) {
     const t = VW.consult.types.find(x => x.id === ev.ctype);
@@ -5913,6 +5956,7 @@ VW.consult.tipLocations = ['SVC', 'Cavo-atrial junction', 'Right atrium (fluoro-
         <span>Done — stamp the time</span>
       </button>
       ${sbBtn}
+      ${WAIT_TIMERS.map(w => waitTimerBtn(ev, w)).join('')}
       ${compact
         ? (ev.room ? '' : `<div class="oc-drop"><button data-act="editOpenRoom" data-id="${ev.id}">Add room</button></div>`)
         : `<div class="oc-drop">
@@ -7599,6 +7643,9 @@ ICU-3 temp cvc ij tunneled
         save(true); render();
         break;
       }
+      case 'waitNoPt': toggleWaitTimer(id, 'waitNoPt'); break;
+      case 'waitChair': toggleWaitTimer(id, 'waitChair'); break;
+      case 'waitTransfer': toggleWaitTimer(id, 'waitTransfer'); break;
       case 'clearRounds':
         openSheet({
           title: 'Clear the list?',
@@ -7960,6 +8007,13 @@ ICU-3 temp cvc ij tunneled
       const item = (S.rounds || []).find(x => x.id === rid) ||
         ((cur() || {}).events || []).find(x => x.id === rid);
       const s = item && researchOpen(item);
+      if (s) el.textContent = fmtDur(Date.now() - s.start);
+    });
+    /* live elapsed on any running consult wait timer */
+    document.querySelectorAll('[data-wait-live]').forEach(el => {
+      const parts = el.getAttribute('data-wait-live').split(':');
+      const item = ((cur() || {}).events || []).find(x => x.id === parts[0]);
+      const s = item && sessOpen(item[parts[1]]);
       if (s) el.textContent = fmtDur(Date.now() - s.start);
     });
     checkReminders();
