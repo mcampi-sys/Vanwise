@@ -1299,6 +1299,9 @@ VW.opts = {
     { id: 'cvc',      label: 'CVC' },
     { id: 'cvc-tunneled',    label: 'Tunneled CVC' },
     { id: 'cvc-nontunneled', label: 'Non-tunneled CVC' },
+    { id: 'cvc-temp-ij',           label: 'Temp CVC (IJ)' },
+    { id: 'cvc-temp-ij-tunneled',  label: 'Temp CVC (IJ) — Tunneled' },
+    { id: 'cvc-temp-ij-nontunneled', label: 'Temp CVC (IJ) — Non-tunneled' },
     { id: 'port',     label: 'Port / IVAD' },
     { id: 'apheresis',label: 'Apheresis / HD' },
     { id: 'io',       label: 'IO' },
@@ -3898,7 +3901,9 @@ VW.consult.tipLocations = ['SVC', 'Cavo-atrial junction', 'Right atrium (fluoro-
     flags: [],
     nurses: [],
     rounds: [],
-    parkingNote: ''
+    parkingNote: '',
+    restockNeeded: false,
+    cartInventory: {}
   };
 
   /* Official unit roster 2026-09-20..2026-11-14: date -> {day:{name:shift}, night:{name:shift}} */
@@ -4352,6 +4357,14 @@ VW.consult.tipLocations = ['SVC', 'Cavo-atrial junction', 'Right atrium (fluoro-
     const chk = e.target.closest('.check input[type=checkbox]');
     if (chk) chk.closest('.check').dataset.on = String(chk.checked);
   });
+  /* cart inventory ticks persist straight to state, no re-render needed */
+  document.addEventListener('change', e => {
+    const ci = e.target.closest('[data-cartitem]');
+    if (!ci) return;
+    S.cartInventory = S.cartInventory || {};
+    S.cartInventory[ci.dataset.cartitem] = ci.checked;
+    save();
+  });
 
   /* ---------------- consult capture ---------------- */
   function timeField(id, label, ts) {
@@ -4369,6 +4382,10 @@ VW.consult.tipLocations = ['SVC', 'Cavo-atrial junction', 'Right atrium (fluoro-
       return { v: i, l: d ? d.label : i };
     });
     return chipGroup(name, opts, sel, false);
+  }
+  /* multi-select device chips — one tap per line in the room ("add line") */
+  function devChipsMulti(name, ids, selected) {
+    return chipGroup(name, ids.map(i => ({ v: i, l: devLabel(i) || i })), selected || [], true);
   }
   function multiCheck(prefix, items, selected) {
     return items.map((x, i) => checkBox(prefix + i, x, (selected || []).indexOf(x) >= 0)).join('');
@@ -4798,6 +4815,17 @@ VW.consult.tipLocations = ['SVC', 'Cavo-atrial junction', 'Right atrium (fluoro-
     (ev.research || []).forEach(s => { if (!s.end) s.end = ev.at; });
     save(true);
     openConsultForm(ev.ctype || 'access', ev);
+    askRestockCart();
+  }
+
+  /* after a consult is marked finished, ask whether the cart needs restocking */
+  function askRestockCart() {
+    openSheet({
+      title: 'Consult finished',
+      body: `<div class="help" style="margin-bottom:14px">Restock the cart?</div>
+        <button class="btn btn-primary btn-block" data-act="restockYes">Remind me</button>
+        <button class="btn btn-ghost btn-block" data-act="restockNo" style="margin-top:9px">Skip</button>`
+    });
   }
 
   function dropConsult(id) {
@@ -4928,8 +4956,8 @@ VW.consult.tipLocations = ['SVC', 'Cavo-atrial junction', 'Right atrium (fluoro-
           <button type="button" class="btn btn-gold btn-sm" data-now="kTime">Stamp now</button></div>
         </div>
         <div class="field"><label for="kRoom">Room / unit</label><input type="text" id="kRoom" value="${esc(ev.room || '')}" placeholder="e.g. 3E-07"></div>
-        <div class="field"><label class="field-label">Device</label>
-          ${devChips('kDevice', CHECK_DEVICES, ev.device || 'picc')}</div>
+        <div class="field"><label class="field-label">Devices — tap each line</label>
+          ${devChipsMulti('kDevice', CHECK_DEVICES, (ev.devices && ev.devices.length) ? ev.devices : [ev.device || 'picc'])}</div>
         <div class="field"><label class="field-label">Side</label>
           ${chipGroup('kSide', VW.opts.sides.map(s => ({ v: s, l: s })), ev.side || null, false)}</div>
         <div class="inline-2">
@@ -4955,7 +4983,8 @@ VW.consult.tipLocations = ['SVC', 'Cavo-atrial junction', 'Right atrium (fluoro-
           kind: 'check',
           at: timeToTs(dayKey, ($('#kTime', root) || {}).value || fmtClock24(Date.now())),
           room: ($('#kRoom', root) || {}).value || '',
-          device: chipValue(root, 'kDevice'),
+          device: (chipValue(root, 'kDevice') || [])[0] || 'picc',
+          devices: chipValue(root, 'kDevice') || [],
           side: chipValue(root, 'kSide'),
           exposure: ($('#kExp', root) || {}).value || '',
           circ: ($('#kCirc', root) || {}).value || '',
@@ -5125,8 +5154,8 @@ VW.consult.tipLocations = ['SVC', 'Cavo-atrial junction', 'Right atrium (fluoro-
     }
     if (ev.kind === 'check') {
       const seg = [];
-      const d = VW.opts.devices.find(x => x.id === ev.device);
-      if (d) seg.push(d.label);
+      const dl = evDevLabels(ev);
+      if (dl) seg.push(dl);
       if (ev.side) seg.push(ev.side);
       if (ev.exposure) seg.push('exp ' + ev.exposure + ' cm');
       if (ev.circ) seg.push('circ ' + ev.circ + ' cm');
@@ -5263,6 +5292,11 @@ VW.consult.tipLocations = ['SVC', 'Cavo-atrial junction', 'Right atrium (fluoro-
       </div>
     </div>`;
 
+    /* restock reminder — shows on the clocked-in home until marked done */
+    if (S.restockNeeded) {
+      html += `<div class="banner"><div><b>🔄 Cart needs restocking</b><div class="muted" style="font-size:12.5px">You asked to be reminded after the last consult.</div></div>
+        <button class="btn btn-sm btn-primary" data-act="restockDone">Restock done</button></div>`;
+    }
     html += parkingSpot();
     html += `<div class="shift-cols"><div>`;
 
@@ -5294,11 +5328,10 @@ VW.consult.tipLocations = ['SVC', 'Cavo-atrial junction', 'Right atrium (fluoro-
         const pct = rs.total ? Math.round((rs.done / rs.total) * 100) : 0;
         html += `<div class="meter-track" style="margin-bottom:11px"><div class="meter-fill ${pct === 100 ? 'good' : ''}" style="width:${pct}%"></div></div>`;
         html += `<div class="todo-grid">` + toCheck.slice(0, 8).map(it => {
-          const dev = VW.opts.devices.find(d => d.id === it.device);
           return `<div class="todo-room">
             <button class="tr-head" data-act="goRounds">
               <span class="tr-no">${esc(it.room)}</span>
-              <span class="tr-dev">${esc(dev ? dev.label : 'tap to set')}</span>
+              <span class="tr-dev">${esc(devLabels(roundDevices(it)) || 'tap to set')}</span>
               ${it.due === 'change' ? '<span class="badge badge-gold tr-badge">change due</span>' : ''}
             </button>
             <div class="tr-act">
@@ -5425,7 +5458,22 @@ VW.consult.tipLocations = ['SVC', 'Cavo-atrial junction', 'Right atrium (fluoro-
 
   /* ---------------- rounds: the start-of-shift worklist ---------------- */
   /* checks only cover these — no PIV, no IO */
-  const CHECK_DEVICES = ['midline', 'picc', 'cvc', 'cvc-tunneled', 'cvc-nontunneled', 'port', 'apheresis'];
+  const CHECK_DEVICES = ['midline', 'picc', 'cvc', 'cvc-tunneled', 'cvc-nontunneled',
+    'cvc-temp-ij', 'cvc-temp-ij-tunneled', 'cvc-temp-ij-nontunneled', 'port', 'apheresis'];
+
+  /* a check room can carry more than one line: devices[] holds them all,
+     device stays the primary (first) one for anything that reads a single id */
+  function roundDevices(it) {
+    if (!it) return [];
+    const ids = (Array.isArray(it.devices) && it.devices.length ? it.devices : (it.device ? [it.device] : []))
+      .filter(d => CHECK_DEVICES.indexOf(d) >= 0);
+    return ids;
+  }
+  function devLabels(ids) { return (ids || []).map(devLabel).filter(Boolean).join(' + '); }
+  function evDevLabels(ev) {
+    if (!ev) return '';
+    return devLabels((ev.devices && ev.devices.length) ? ev.devices : (ev.device ? [ev.device] : []));
+  }
   const CHECK_FIELDS = [
     { k: 'intact',      l: 'Dressing intact' },
     { k: 'bloodReturn', l: 'Blood return' },
@@ -5438,9 +5486,10 @@ VW.consult.tipLocations = ['SVC', 'Cavo-atrial junction', 'Right atrium (fluoro-
   const ROUND_DEVICES = [
     { re: /\bpicc\b/i,                         id: 'picc' },
     { re: /\bmidlines?\b|\bml\b/i,             id: 'midline' },
+    { re: /\btemp\w*\s+cvc\b|\bij\b|\bijc\b/i, id: 'cvc-temp-ij' },
     { re: /\bnon-?tunneled cvc\b/i,            id: 'cvc-nontunneled' },
     { re: /\btunneled cvc\b|\btunneled central\b/i, id: 'cvc-tunneled' },
-    { re: /\bcvc\b|central|\btlc\b|\bijc?\b/i, id: 'cvc' },
+    { re: /\bcvc\b|central|\btlc\b/i,           id: 'cvc' },
     { re: /\bports?\b|\bivad\b|power ?port/i,  id: 'port' },
     { re: /dialysis|\bhd\b|trialysis|apheresis|crrt|perma/i, id: 'apheresis' }
   ];
@@ -5454,18 +5503,30 @@ VW.consult.tipLocations = ['SVC', 'Cavo-atrial junction', 'Right atrium (fluoro-
       if (!m) return;
       const room = m[1];
       const rest = m[2] || '';
-      let device = null, matched = null;
-      for (const d of ROUND_DEVICES) { if (d.re.test(line)) { device = d.id; matched = d.re; break; } }
+      /* a room can carry more than one line — collect every device keyword on the line */
+      const devHits = ROUND_DEVICES.filter(d => d.re.test(line));
+      const devIds = devHits.map(d => d.id);
+      /* "temp cvc" with a tunneled / non-tunneled word is its own device, not plain temp */
+      if (devIds[0] === 'cvc-temp-ij') {
+        if (/\bnon-?tunneled\b/i.test(rest)) devIds[0] = 'cvc-temp-ij-nontunneled';
+        else if (/\btunneled\b/i.test(rest)) devIds[0] = 'cvc-temp-ij-tunneled';
+      }
+      /* a specific CVC kind already says "cvc" — drop the generic hit */
+      let devices = devIds.some(d => d !== 'cvc' && /^(cvc-tunneled|cvc-nontunneled|cvc-temp-ij)/.test(d))
+        ? devIds.filter(d => d !== 'cvc') : devIds;
+      /* "non-tunneled" also trips the plain "tunneled" keyword — the non wins */
+      if (devices.indexOf('cvc-nontunneled') >= 0) devices = devices.filter(d => d !== 'cvc-tunneled');
+      const device = devices[0] || null;
       const dueRe = /\bchange[ds]?\b|\bchg\b|\breplace[ds]?\b|\bdue\b/i;
       const due = dueRe.test(rest) ? 'change' : 'check';
       const statRe = /\bstat\b/i;
       const stat = statRe.test(rest);
       // the detail line should carry what the device badge and the due badge do not
       let note = rest;
-      if (matched) note = note.replace(new RegExp(matched.source, 'gi'), ' ');
+      devHits.forEach(d => { note = note.replace(new RegExp(d.re.source, 'gi'), ' '); });
       note = note.replace(new RegExp(dueRe.source, 'gi'), ' ').replace(new RegExp(statRe.source, 'gi'), ' ').replace(/\s+/g, ' ').trim();
       out.push({
-        id: uid(), room: room, device: device, due: due,
+        id: uid(), room: room, device: device, devices: devices, due: due,
         note: note, status: 'pending', changed: false, at: null, stat: stat
       });
     });
@@ -5483,8 +5544,8 @@ VW.consult.tipLocations = ['SVC', 'Cavo-atrial junction', 'Right atrium (fluoro-
     if (!item) return;
     const card = $(`.round-card[data-round="${id}"]`);
     if (!card) return;
-    const dv = chipValue(card, 'rcDev_' + id);
-    if (dv) item.device = dv;
+    const dvs = chipValue(card, 'rcDev_' + id);
+    if (dvs && dvs.length) { item.devices = dvs; item.device = dvs[0]; }
     const exp = $('#rcExp_' + id, card), circ = $('#rcCirc_' + id, card), note = $('#rcNote_' + id, card);
     if (exp) item.exposure = exp.value || '';
     if (circ) item.circ = circ.value || '';
@@ -5513,7 +5574,7 @@ VW.consult.tipLocations = ['SVC', 'Cavo-atrial junction', 'Right atrium (fluoro-
     if (sh) {
       const ev = {
         id: uid(), kind: 'check', at: item.at,
-        room: item.room, device: item.device || 'other', side: null,
+        room: item.room, device: item.device || 'other', devices: roundDevices(item), side: null,
         exposure: item.exposure || '', circ: item.circ || '',
         checked: true, changed: !!changed,
         intact: !!(item.fields || {}).intact,
@@ -5545,7 +5606,6 @@ VW.consult.tipLocations = ['SVC', 'Cavo-atrial junction', 'Right atrium (fluoro-
   }
 
   function roundRow(it) {
-    const dev = VW.opts.devices.find(d => d.id === it.device);
     const open = roundOpen === it.id;
     const f = it.fields || {};
     const rms = researchMs(it);
@@ -5556,8 +5616,8 @@ VW.consult.tipLocations = ['SVC', 'Cavo-atrial junction', 'Right atrium (fluoro-
       : `<button class="btn btn-sm btn-ghost" data-act="researchRound" data-id="${it.id}">${rms > 60000 ? 'Research · ' + fmtDur(rms) : 'Research pt'}</button>`;
     /* the measurement and assessment block — identical whether the room is
        still to do or already ticked off, so the numbers can always be entered */
-    const fieldBlock = done => `<div class="field" style="margin-bottom:10px"><label class="field-label">Device</label>
-        ${devChips('rcDev_' + it.id, CHECK_DEVICES, it.device || null)}</div>
+    const fieldBlock = done => `<div class="field" style="margin-bottom:10px"><label class="field-label">Devices — tap each line in this room</label>
+        ${devChipsMulti('rcDev_' + it.id, CHECK_DEVICES, roundDevices(it))}</div>
       <div class="inline-2">
         <div class="field"><label for="rcExp_${it.id}">Exposed (cm)</label>
           <input type="number" step="0.1" inputmode="decimal" id="rcExp_${it.id}" value="${esc(it.exposure || '')}" placeholder="0.0"></div>
@@ -5583,11 +5643,12 @@ VW.consult.tipLocations = ['SVC', 'Cavo-atrial junction', 'Right atrium (fluoro-
         </div>`}`;
 
     if (it.status === 'done') {
-      const missing = !it.exposure && !it.circ && (it.device === 'picc' || it.device === 'midline' || it.device === 'cvc' || it.device === 'cvc-tunneled' || it.device === 'cvc-nontunneled');
+      const centralish = ['picc', 'midline', 'cvc', 'cvc-tunneled', 'cvc-nontunneled'];
+      const missing = !it.exposure && !it.circ && roundDevices(it).some(d => centralish.indexOf(d) >= 0 || d.indexOf('cvc-temp-ij') === 0);
       return `<div class="round-card is-done${open ? ' is-open' : ''}" data-round="${it.id}">
         <button class="rc-head" data-act="toggleRound" data-id="${it.id}">
           <span class="rc-room">${esc(it.room)}</span>
-          <span class="rc-meta">${esc(dev ? dev.label : '')} · ${it.changed ? 'changed' : 'checked'} ${fmtClock(it.at)}${it.exposure ? ' · exp ' + esc(it.exposure) : ''}${it.circ ? ' · circ ' + esc(it.circ) : ''}</span>
+          <span class="rc-meta">${esc(devLabels(roundDevices(it)))} · ${it.changed ? 'changed' : 'checked'} ${fmtClock(it.at)}${it.exposure ? ' · exp ' + esc(it.exposure) : ''}${it.circ ? ' · circ ' + esc(it.circ) : ''}</span>
           ${(it.stat || missing) ? `<span class="rc-badge" style="display:flex;gap:6px">${it.stat ? '<span class="badge badge-stat">STAT</span>' : ''}${missing ? '<span class="badge badge-gold">add cm</span>' : ''}</span>` : ''}
           <span class="rc-tick">${I.ok}</span>
         </button>
@@ -5597,7 +5658,7 @@ VW.consult.tipLocations = ['SVC', 'Cavo-atrial junction', 'Right atrium (fluoro-
     return `<div class="round-card${open ? ' is-open' : ''}" data-round="${it.id}">
       <button class="rc-head" data-act="toggleRound" data-id="${it.id}">
         <span class="rc-room">${esc(it.room)}</span>
-        <span class="rc-meta">${esc(dev ? dev.label : 'tap to set device')}${it.note ? ' · ' + esc(it.note) : ''}${rms > 60000 ? ' · research ' + fmtDur(rms) : ''}</span>
+          <span class="rc-meta">${esc(devLabels(roundDevices(it)) || 'tap to set device')}${it.note ? ' · ' + esc(it.note) : ''}${rms > 60000 ? ' · research ' + fmtDur(rms) : ''}</span>
         ${(it.stat || it.due === 'change') ? `<span class="rc-badge" style="display:flex;gap:6px">${it.stat ? '<span class="badge badge-stat">STAT</span>' : ''}${it.due === 'change' ? '<span class="badge badge-gold">change due</span>' : ''}</span>` : ''}
         <span class="rc-caret">${I.chev}</span>
       </button>
@@ -5618,7 +5679,7 @@ VW.consult.tipLocations = ['SVC', 'Cavo-atrial junction', 'Right atrium (fluoro-
       body: `<div class="field"><label for="roundPaste">One room per line</label>
         <textarea id="roundPaste" style="min-height:210px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:15px"
           placeholder="4W-12 PICC change&#10;3E-07 midline&#10;ICU-3 CVC dressing change&#10;5W-22 port"></textarea></div>
-        <div class="help">Room first, then the device and anything else. Veinwise picks up PICC, midline, CVC, port, dialysis, PIV and IO, and flags the line if it says change or due.</div>`,
+        <div class="help">Room first, then the device(s) and anything else. Veinwise picks up PICC, midline, CVC, temp CVC (IJ), port, dialysis, PIV and IO — more than one line per room is fine — and flags the line if it says change or due.</div>`,
       confirm: 'Add to list',
       onConfirm: () => {
         const root = $('.sheet', sheetStack[sheetStack.length - 1]);
@@ -5650,9 +5711,12 @@ VW.consult.tipLocations = ['SVC', 'Cavo-atrial junction', 'Right atrium (fluoro-
         const room = String((x && x.room) || '').trim();
         if (!room) return;
         if (S.rounds.some(e => String(e.room).toLowerCase() === room.toLowerCase() && e.status !== 'done')) return;
+        /* the importer can hand a room more than one line */
+        const impDevs = (Array.isArray(x.devices) ? x.devices : []).filter(d => CHECK_DEVICES.indexOf(d) >= 0);
+        if (CHECK_DEVICES.indexOf(x.device) >= 0 && impDevs.indexOf(x.device) < 0) impDevs.unshift(x.device);
         S.rounds.push({
           id: uid(), room: room,
-          device: CHECK_DEVICES.indexOf(x.device) >= 0 ? x.device : null,
+          device: impDevs[0] || null, devices: impDevs,
           due: x.due === 'change' ? 'change' : 'check',
           note: String(x.note || ''), status: 'pending',
           changed: false, at: null, eventId: null, stat: !!x.stat
@@ -5675,8 +5739,8 @@ VW.consult.tipLocations = ['SVC', 'Cavo-atrial junction', 'Right atrium (fluoro-
       title: existing ? 'Edit room' : 'Add a room',
       body: `<div class="field"><label for="rRoom">Room / unit</label>
           <input type="text" id="rRoom" value="${esc(it.room || '')}" placeholder="4W-12"></div>
-        <div class="field"><label class="field-label">Device</label>
-          ${devChips('rDevice', CHECK_DEVICES, it.device || null)}</div>
+        <div class="field"><label class="field-label">Devices — tap each line in this room</label>
+          ${devChipsMulti('rDevice', CHECK_DEVICES, roundDevices(it))}</div>
         <div class="field"><label class="field-label">What is due</label>
           ${chipGroup('rDue', [{ v: 'check', l: 'Check' }, { v: 'change', l: 'Change due' }], it.due || 'check', false)}</div>
         <div class="field"><label class="field-label">Priority</label>
@@ -5690,9 +5754,10 @@ VW.consult.tipLocations = ['SVC', 'Cavo-atrial junction', 'Right atrium (fluoro-
         const root = $('.sheet', sheetStack[sheetStack.length - 1]);
         const room = (($('#rRoom', root) || {}).value || '').trim();
         if (!room) { toast('Room is required'); return false; }
+        const rDevs = chipValue(root, 'rDevice') || [];
         const rec = {
           id: existing ? existing.id : uid(), room: room,
-          device: chipValue(root, 'rDevice'), due: chipValue(root, 'rDue') || 'check',
+          device: rDevs[0] || null, devices: rDevs, due: chipValue(root, 'rDue') || 'check',
           note: ($('#rNote', root) || {}).value || '',
           status: existing ? existing.status : 'pending',
           changed: existing ? existing.changed : false,
@@ -5961,9 +6026,9 @@ VW.consult.tipLocations = ['SVC', 'Cavo-atrial junction', 'Right atrium (fluoro-
           <div class="field-label" style="margin-bottom:8px">What a pasted list can look like</div>
           <pre class="sample">4W-12 PICC change
 3E-07 midline
-ICU-3 CVC dressing change
+ICU-3 temp cvc ij tunneled
 5W-22 port
-2N-14 PICC, chg due</pre>
+2N-14 PICC dialysis, chg due</pre>
           <div class="help" style="margin-top:8px">Room first, then anything else. Commas or spaces, either is fine.</div>
         </div>`;
     }
@@ -6529,12 +6594,39 @@ ICU-3 CVC dressing change
     factors:   { title: 'What matters', blurb: 'The checks that change your plan, and why', icon: 'brain',  tone: 'tone-green' },
     notes:     { title: 'Shift notes', blurb: 'Timestamped notes for this shift',           icon: 'note',   tone: '' },
     nurses:    { title: 'Nurse list', blurb: 'Sweet ones and problematic ones',             icon: 'note',   tone: 'tone-green' },
+    cart:      { title: 'Cart inventory', blurb: 'What is stocked in each drawer',            icon: 'note',   tone: 'tone-green' },
     calendar:  { title: 'Calendar',  blurb: 'Schedule shifts, see what you worked',          icon: 'shift',  tone: '' },
     crew:      { title: "Who's working", blurb: 'See your crew for each scheduled day', icon: 'shift', tone: 'tone-green' },
     history:   { title: 'History',   blurb: 'Open a past shift and review everything',       icon: 'log',    tone: '' },
     settings:  { title: 'Settings',  blurb: 'Targets, reminders, notifications, theme',      icon: 'theme',  tone: '' },
     data:      { title: 'Backup',    blurb: 'Export, import, storage',                       icon: 'link',   tone: '' }
   };
+
+  /* the vascular access cart, drawer by drawer — tick what is stocked */
+  const CART_DRAWERS = [
+    { name: '1st drawer', items: ['Chloraprep wipes', 'Alcohol wipes', 'Adhesive removal', 'Lubricant jelly', 'Penlight', 'Clear tape', 'Paper tape', 'Sharpie', 'Measuring tape', 'No-sting barrier film (Cavilon type)', 'SurePrep protective wipes', 'Gauze', 'Red caps', 'Tourniquet', 'Adhesive spray removal'] },
+    { name: '2nd drawer', items: ['24g IV catheter', '22g IV catheter', '20g IV catheter', '18g IV catheter', 'Drape paper (sterile field)', 'Chloraprep'] },
+    { name: '3rd drawer', items: ['Tegaderm (3M)', 'J-loop', 'IV kit', 'SorbaView IV3000', 'Probe covers'] },
+    { name: '4th drawer', items: ['Vascular stickers', 'Huber needles', 'Power injector', 'Non-power injector', 'Alcohol swabs', 'BIOPATCH', 'Trimmer', 'Sterile gloves', 'Liquid adhesive removal', 'Limb alert bands', 'Blue caps', 'Dialysis caps', 'Needleless connectors', 'Luer lock — syringes', 'Luer lock — J-loop', 'StatLock', 'Suture removal kits', 'Ice packs', 'Sterile strips', 'Diastest tips', 'Band-aids'] },
+    { name: '5th drawer', items: ['IO kit', 'Masks', 'Blood culture collection', 'Stretch net', 'Ice packs', 'Line removal kit', 'Port tray'] }
+  ];
+
+  function viewCartInventory() {
+    const inv = S.cartInventory || {};
+    const total = CART_DRAWERS.reduce((n, d) => n + d.items.length, 0);
+    const on = Object.keys(inv).filter(k => inv[k]).length;
+    let html = `<h1 class="view-title">Cart inventory</h1>
+      <div class="view-sub">${on} of ${total} items stocked — tap to tick what is in the cart.</div>`;
+    CART_DRAWERS.forEach((d, di) => {
+      const stocked = d.items.filter((_, ii) => inv['d' + di + '-' + ii]).length;
+      html += `<div class="section-label">${esc(d.name)} — ${stocked}/${d.items.length}</div><div class="card-flat">` +
+        d.items.map((label, ii) => {
+          const cid = 'd' + di + '-' + ii, checked = !!inv[cid];
+          return `<label class="check" data-on="${checked}"><input type="checkbox" data-cartitem="${cid}" ${checked ? 'checked' : ''}> ${esc(label)}</label>`;
+        }).join('') + `</div>`;
+    });
+    return html;
+  }
 
   function viewMore() {
     if (sub.more === 'reference') return viewRef();
@@ -6543,6 +6635,7 @@ ICU-3 CVC dressing change
       <div class="view-sub">The checks that change your plan, and the reasoning behind each one</div>` + refFactors();
     if (sub.more === 'notes') return `<div class="backbar"><button data-submore="home">${I.back} More</button></div>` + viewNotes();
     if (sub.more === 'nurses') return `<div class="backbar"><button data-submore="home">${I.back} More</button></div>` + viewNurses();
+    if (sub.more === 'cart') return `<div class="backbar"><button data-submore="home">${I.back} More</button></div>` + viewCartInventory();
     if (sub.more === 'calendar') return viewCalendar();
     if (sub.more === 'crew') return viewCrew();
     if (sub.more === 'history') return viewHistory();
@@ -6807,14 +6900,14 @@ ICU-3 CVC dressing change
       if (e.clean) bits.push('clean and dry');
       if (e.note) bits.push(e.note);
       return `<tr><td class="t">${fmtClock(e.at)}</td><td class="r">${esc(e.room || '')}</td>
-        <td><b>${e.changed ? 'Dressing changed' : 'Checked'}</b>${devLabel(e.device) ? ', ' + esc(devLabel(e.device)) : ''}${e.fromRounds ? '<span class="vr-sub">from rounds list</span>' : ''}</td>
+        <td><b>${e.changed ? 'Dressing changed' : 'Checked'}</b>${evDevLabels(e) ? ', ' + esc(evDevLabels(e)) : ''}${e.fromRounds ? '<span class="vr-sub">from rounds list</span>' : ''}</td>
         <td>${esc(bits.join(', '))}</td></tr>`;
     }).join('');
     const metRows = mets.map(e => `<tr><td class="t">${fmtClock(e.at)}</td><td class="r">${esc(e.room || '')}</td>
       <td><b>${esc(e.mtype || 'MET / code')}</b>${e.access ? `<span class="vr-sub">${esc(e.access)}</span>` : ''}</td><td>${esc(e.note || '')}</td></tr>`).join('');
     const rounds = sh.rounds || [];
     const rDone = rounds.filter(r => r.status === 'done').length;
-    const roundRows = rounds.map(r => `<tr><td class="r">${esc(r.room)}</td><td>${esc(devLabel(r.device) || '')}${r.due === 'change' ? '<span class="vr-tag">change due</span>' : ''}${r.note ? `<span class="vr-sub">${esc(r.note)}</span>` : ''}</td>
+    const roundRows = rounds.map(r => `<tr><td class="r">${esc(r.room)}</td><td>${esc(devLabels(roundDevices(r)))}${r.due === 'change' ? '<span class="vr-tag">change due</span>' : ''}${r.note ? `<span class="vr-sub">${esc(r.note)}</span>` : ''}</td>
       <td class="t">${r.status === 'done' ? (r.changed ? 'Changed ' : 'Checked ') + fmtClock(r.at) : '<span class="vp vp-over">Not done</span>'}</td></tr>`).join('');
     const loads = sh.cartLoads || [];
     const loadRows = loads.map(l => `<tr>
@@ -7380,6 +7473,9 @@ ICU-3 CVC dressing change
       case 'clearParking': S.parkingNote = ''; save(true); render(); break;
       case 'pasteRounds': openRoundsPaste(); break;
       case 'pullRounds': pullPendingRounds(true); break;
+      case 'restockYes': S.restockNeeded = true; save(true); closeSheet(); toast('Cart restock reminder set'); break;
+      case 'restockNo': closeSheet(); break;
+      case 'restockDone': S.restockNeeded = false; save(true); toast('Cart marked restocked'); render(); break;
       case 'addRound': openRoundEditor(); break;
       case 'editRound': openRoundEditor((S.rounds || []).find(x => x.id === id)); break;
       case 'doneRound': completeRound(id, false); break;
@@ -7391,6 +7487,7 @@ ICU-3 CVC dressing change
           const ev = sh.events.find(x => x.id === item.eventId);
           if (ev) {
             ev.device = item.device || 'other';
+            ev.devices = roundDevices(item);
             ev.exposure = item.exposure || '';
             ev.circ = item.circ || '';
             ev.note = item.note || '';
