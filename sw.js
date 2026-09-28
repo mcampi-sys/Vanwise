@@ -1,15 +1,11 @@
-/* Veinwise service worker, v31 (consult wait timers)
+/* Veinwise service worker, v32 (policy PDFs are attach-on-demand, on-device only)
    The page itself is network-first so a new build shows up on the next open
    with signal, and the cached copy keeps it working offline. Everything else
-   (policies, intro, icons) is cache-first. Shift data lives in localStorage,
+   (intro, icons) is cache-first. Shift data lives in localStorage,
    which this file never touches. */
-const CACHE = 'veinwise-v31';
+const CACHE = 'veinwise-v32';
 const CORE = ['./', 'index.html', 'manifest.webmanifest', 'icon-192.png', 'icon-512.png', 'icon-maskable-512.png'];
-const EXTRA = ['intro.webm', 'intro.mp4',
-  'policies/BD-120470-powerflow-vs-powerport.pdf', 'policies/M03-03-564-high-alert-meds.pdf',
-  'policies/M03-10-299-extravasation.pdf', 'policies/M03-10-357-hemodialysis-catheters.pdf',
-  'policies/M03-10-432-intraosseous.pdf', 'policies/M03-10-448-iv-therapy-general.pdf',
-  'policies/M03-10-605-midline-adult.pdf', 'policies/M03-10-711-picc-usg-adult.pdf'];
+const EXTRA = ['intro.webm', 'intro.mp4'];
 
 self.addEventListener('install', e => {
   e.waitUntil((async () => {
@@ -33,11 +29,6 @@ self.addEventListener('fetch', e => {
   if (req.method !== 'GET') return;
   const url = new URL(req.url);
   if (url.origin !== location.origin) return;
-  if (url.pathname.endsWith('pending-rounds.json')) {
-    /* Blaid's room drops: always network, never cached */
-    e.respondWith(fetch(req, { cache: 'no-store' }).catch(() => Response.error()));
-    return;
-  }
   const isPage = req.mode === 'navigate' || url.pathname.endsWith('/') || url.pathname.endsWith('index.html');
   if (isPage) {
     e.respondWith((async () => {
