@@ -90,7 +90,6 @@
     --good-soft:#0E3226;
     --shadow:0 1px 2px rgba(0,0,0,.4), 0 4px 16px rgba(0,0,0,.3);
     --shadow-lg:0 10px 40px rgba(0,0,0,.5);
-  }
 }
 :root[data-theme="dark"]{
   --bg:#061821;
@@ -3564,7 +3563,7 @@ VW.grade.deviceTargets = {
   port: 15, apheresis: 20, io: 5, other: 20
 };
 VW.grade.typeTargets = {
-  access: 15, trouble: 45, clearing: 15, deaccess: 12, dressing: 12
+  access: 15, trouble: 45, clearing: 15, deaccess: 12, dressing: 12, removal: 20
 };
 
 VW.grade.targetFor = function (ev) {
@@ -3768,6 +3767,7 @@ VW.consult.types = [
   { id: 'trouble',  label: 'Troubleshooting',   hint: 'Occlusion, no blood return, tPA', icon: 'wrench', tone: 'tone-clay' },
   { id: 'clearing', label: 'Clearing a device', hint: 'Clear an existing line for use',  icon: 'shield', tone: '' },
   { id: 'deaccess', label: 'Access / de-access',hint: 'Port needle in or out, removal',  icon: 'swap',   tone: '' },
+  { id: 'removal',  label: 'Line removal',      hint: 'Central line / PICC / midline out', icon: 'pull',  tone: '' },
   { id: 'dressing', label: 'Dressing change',   hint: 'Routine or PRN',                  icon: 'dressing', tone: '' },
   { id: 'education', label: 'Education',        hint: 'Teaching / inservice time',        icon: 'book',     tone: '' }
 ];
@@ -3777,6 +3777,7 @@ VW.consult.accessDevices   = ['piv', 'usgpiv', 'midline', 'picc'];
 VW.consult.troubleDevices  = ['picc', 'cvc', 'cvc-tunneled', 'cvc-nontunneled', 'port', 'midline', 'apheresis'];
 VW.consult.clearingDevices = ['picc', 'cvc', 'cvc-tunneled', 'cvc-nontunneled', 'port', 'midline'];
 VW.consult.deaccessDevices = ['port', 'apheresis', 'picc', 'cvc', 'cvc-tunneled', 'cvc-nontunneled', 'midline'];
+VW.consult.removalDevices  = ['midline', 'picc', 'cvc', 'cvc-temp-ij', 'cvc-temp-ij-tunneled', 'cvc-temp-ij-nontunneled', 'cvc-tunneled', 'cvc-nontunneled', 'apheresis'];
 
 VW.consult.accessReasons = [
   'New access needed',
@@ -3873,6 +3874,7 @@ VW.consult.tipLocations = ['SVC', 'Cavo-atrial junction', 'Right atrium (fluoro-
     wrench: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M15.5 3.5a5 5 0 0 0-6 6.6L4 15.6a2 2 0 0 0 2.8 2.8l5.5-5.5a5 5 0 0 0 6.6-6l-3 3-2.4-2.4z"/></svg>',
     shield: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 5 6v6c0 4.4 3 7.9 7 9 4-1.1 7-4.6 7-9V6z"/><path d="m9 12 2 2 4-4"/></svg>',
     swap: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h13l-3-3M20 16H7l3 3"/></svg>',
+    pull: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="13" y="10" width="8" height="10" rx="2"/><path d="M9 20V8"/><path d="m6 11 3-3 3 3"/></svg>',
     sun: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="4.2"/><path d="M12 2.6v2.2M12 19.2v2.2M2.6 12h2.2M19.2 12h2.2M5.4 5.4l1.6 1.6M17 17l1.6 1.6M18.6 5.4 17 7M7 17l-1.6 1.6"/></svg>',
     moon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 14.2A8.4 8.4 0 0 1 9.8 4 8.4 8.4 0 1 0 20 14.2z"/></svg>',
     close: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>',
@@ -4654,6 +4656,45 @@ VW.consult.tipLocations = ['SVC', 'Cavo-atrial junction', 'Right atrium (fluoro-
     }, readRemoval(root));
   }
 
+  /* ---- branch: Line removal ---- */
+  function bodyRemovalConsult(ev) {
+    const d = ev.removal || {};
+    const dev = d.device || 'picc';
+    const tunneled = dev === 'cvc-tunneled' || dev === 'cvc-temp-ij-tunneled';
+    return `
+      <div class="field"><label class="field-label">Device</label>
+        ${devChips('rDevice', VW.consult.removalDevices, dev).replace('data-chipgroup', 'data-onchange="removal" data-chipgroup')}</div>
+      <div data-block="tunnelwarn" ${tunneled ? '' : 'hidden'}>
+        <div class="callout warn">${I.warn}<div>Tunneled device — per policy M03 10 112 removal is by a licensed independent practitioner only. Confirm the order and your role before proceeding.</div></div>
+      </div>
+      <div class="field"><label class="field-label">Reason for removal</label>
+        ${chipGroup('rReason', ['Therapy complete', 'Suspected infection', 'Occlusion / malfunction', 'Malpositioned / dislodged', 'Phlebitis', 'Patient / family request', 'Other'].map(x => ({ v: x, l: x })), d.reason || null, false)}</div>
+      ${checkBox('rOrder', 'Provider order obtained', d.order)}
+      <div class="section-label">Line out</div>
+      ${checkBox('rDone', 'Line removed', d.removed)}
+      <div class="inline-2">
+        <div class="field"><label for="rInit">Length at insertion (cm)</label>
+          <input type="number" step="0.1" id="rInit" value="${esc(d.removalInit || '')}" placeholder="what went in"></div>
+        <div class="field"><label for="rLast">Length on removal (cm)</label>
+          <input type="number" step="0.1" id="rLast" value="${esc(d.removalLast || '')}" placeholder="what came out"></div>
+      </div>
+      ${checkBox('rTip', 'Tip intact, catheter complete', d.tipIntact)}
+      <div class="help">Compare the two numbers. If what came out is shorter than what went in, the catheter is not complete — do not discard it, escalate immediately.</div>
+      ${checkBox('rHemo', 'Hemostasis achieved, dressing applied', d.hemostasis)}`;
+  }
+  function readRemovalConsult(root) {
+    return {
+      device: chipValue(root, 'rDevice'),
+      reason: chipValue(root, 'rReason'),
+      order: (($('#rOrder', root) || {}).checked) || false,
+      removed: (($('#rDone', root) || {}).checked) || false,
+      removalInit: ($('#rInit', root) || {}).value || '',
+      removalLast: ($('#rLast', root) || {}).value || '',
+      tipIntact: (($('#rTip', root) || {}).checked) || false,
+      hemostasis: (($('#rHemo', root) || {}).checked) || false
+    };
+  }
+
   /* ---- branch: Dressing change ---- */
   function bodyDressing(ev) {
     const d = ev.dressing || {};
@@ -4711,6 +4752,7 @@ VW.consult.tipLocations = ['SVC', 'Cavo-atrial junction', 'Right atrium (fluoro-
     trouble:  { body: bodyTrouble,  read: readTrouble,  key: 'trouble' },
     clearing: { body: bodyClearing, read: readClearing, key: 'clearing' },
     deaccess: { body: bodyDeaccess, read: readDeaccess, key: 'deaccess' },
+    removal:  { body: bodyRemovalConsult, read: readRemovalConsult, key: 'removal' },
     dressing: { body: bodyDressing, read: readDressing, key: 'dressing' },
     education: { body: bodyEducation, read: readEducation, key: 'education' }
   };
@@ -4942,6 +4984,10 @@ VW.consult.tipLocations = ['SVC', 'Cavo-atrial junction', 'Right atrium (fluoro-
       show('nobloodwarn', !(($('#dBlood', root) || {}).checked));
       show('removal', (($('#rmDone', root) || {}).checked));
     }
+    if (type === 'removal') {
+      const dev = chipValue(root, 'rDevice');
+      show('tunnelwarn', dev === 'cvc-tunneled' || dev === 'cvc-temp-ij-tunneled');
+    }
   }
 
   /* ---------------- check form ---------------- */
@@ -5072,7 +5118,7 @@ VW.consult.tipLocations = ['SVC', 'Cavo-atrial junction', 'Right atrium (fluoro-
     const bits = [];
     if (ev.room) bits.push(ev.room);
     if (ev.kind === 'consult') {
-      const a = ev.access, t = ev.trouble, c = ev.clearing, d = ev.deaccess, dr = ev.dressing, ed = ev.education;
+      const a = ev.access, t = ev.trouble, c = ev.clearing, d = ev.deaccess, dr = ev.dressing, ed = ev.education, r = ev.removal;
       if (ev.canceled) bits.push('consult canceled');
       if (ev.isolation) bits.push('isolation precautions');
       if (researchMs(ev) > 60000) bits.push('chart read ' + fmtDur(researchMs(ev)) + ' (SB)');
@@ -5132,6 +5178,14 @@ VW.consult.tipLocations = ['SVC', 'Cavo-atrial junction', 'Right atrium (fluoro-
         if (d.draw) seg.push('blood drawn');
         if (d.removed) seg.push('removed ' + (d.removalInit || '?') + ' → ' + (d.removalLast || '?') + ' cm' + (d.tipIntact ? ', tip intact' : ''));
         bits.push(seg.join(' · '));
+      }
+      if (r) {
+        const seg = [];
+        if (r.reason) seg.push(r.reason);
+        if (r.order) seg.push('order obtained');
+        if (r.removed) seg.push('removed' + ((r.removalInit || r.removalLast) ? ' ' + (r.removalInit || '?') + ' → ' + (r.removalLast || '?') + ' cm' : '') + (r.tipIntact ? ', tip intact' : ''));
+        if (r.hemostasis) seg.push('hemostasis');
+        if (seg.length) bits.push(seg.join(' · '));
       }
       if (dr) {
         const seg = [];
