@@ -1869,7 +1869,7 @@ VW.policies = [
     related:'M03 10 112 CVAD Adult · M03 10 605 Midline · M03 01 115 CHG · M03 05 404 Limited Extremity Use'
   },
   {
-    id:'m10112', pdf:'policies/M03-10-112-cvad-adult.pdf', num:'M03 10 112', name:'Central Venous Access Device Catheters – Adult', rev:'Revised 3/2026 · Next review 3/28',
+    id:'m10112', num:'M03 10 112', name:'Central Venous Access Device Catheters – Adult', rev:'Revised 3/2026 · Next review 3/28',
     tag:'CVAD',
     points:[
       'Covers insertion, care, maintenance and removal of CVADs in adults. Only licensed practitioners with delineated privileges and demonstrated competencies may insert them.',
@@ -1892,7 +1892,7 @@ VW.policies = [
     related:'M03 10 711 PICC · M03 10 605 Midline · M03 10 448 IV Therapy · M03 10 028 Alteplase'
   },
   {
-    id:'vanduties', pdf:'policies/Quick-Guide-Primary-RN-vs-VAN.pdf', num:'Quick Guide', name:'Primary RN vs. Vascular Access Team (VAN) Duties', rev:'Dated 6/3/2026',
+    id:'vanduties', num:'Quick Guide', name:'Primary RN vs. Vascular Access Team (VAN) Duties', rev:'Dated 6/3/2026',
     tag:'VAN',
     points:[
       'Scope: floor RNs (excludes ICU, ED, procedural areas). Primary RN monitors all sites throughout the shift, completes routine & PRN policy-driven line/site documentation, flushes lines AND must check for blood return, and manages complications and post-infiltration/extravasation care per policy.',
@@ -3911,6 +3911,7 @@ VW.consult.tipLocations = ['SVC', 'Cavo-atrial junction', 'Right atrium (fluoro-
   };
 
   /* Official unit roster 2026-09-20..2026-11-14: date -> {day:{name:shift}, night:{name:shift}} */
+  /* Staff roster removed 2026-09-28 for privacy — the crew view now shows a notice instead. */
   const ROSTER = {};
   let S = load();
   function load() {
@@ -6769,6 +6770,7 @@ ICU-3 temp cvc ij tunneled
     let html = `<button class="btn btn-ghost btn-sm" data-submore="home" style="margin-bottom:12px">${I.back} More</button>
       <h1 class="view-title">Who's working</h1>
       <div class="view-sub">Your crew for each scheduled shift</div>`;
+    if (!Object.keys(ROSTER).length) return html + `<div class="empty"><b>Crew list removed</b>The staff roster was taken out of the app for privacy. Your own shifts are still in the Calendar.</div>`;
     if (!schedDates.length) return html + `<div class="empty"><b>No scheduled shifts yet</b>Add shifts in the Calendar and they will show up here.</div>`;
     const today = new Date(); const tk = today.getFullYear() + '-' + String(today.getMonth() + 1).padStart(2, '0') + '-' + String(today.getDate()).padStart(2, '0');
     if (!crewDate || schedDates.indexOf(crewDate) < 0) crewDate = schedDates.find(d => d >= tk) || schedDates[schedDates.length - 1];
