@@ -5762,7 +5762,7 @@ VW.consult.tipLocations = ['SVC', 'Cavo-atrial junction', 'Right atrium (fluoro-
     });
   }
 
-  /* pull rooms Blaid pushed to pending-rounds.json in the repo */
+  /* pull rooms from pending-rounds.json in the repo (retired 2026-09-28 — room data no longer synced via GitHub) */
   function pullPendingRounds(manual) {
     let ctl = null;
     try { ctl = new AbortController(); } catch (e) { ctl = null; }
@@ -5800,7 +5800,7 @@ VW.consult.tipLocations = ['SVC', 'Cavo-atrial junction', 'Right atrium (fluoro-
       else if (manual) toast('List was already up to date');
     }).catch(() => {
       clearTimeout(timer);
-      if (manual) toast('Could not reach the server — check signal');
+      if (manual) toast('No rooms file on the server');
     });
   }
 
