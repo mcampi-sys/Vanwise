@@ -1811,7 +1811,7 @@ VW.meds = [
 /* ---------------- Policies ---------------- */
 VW.policies = [
   {
-    id:'m10448', pdf:'policies/M03-10-448-iv-therapy-general.pdf', num:'M03 10 448', name:'IV Therapy – General Guidelines', rev:'Revised 12/2025 · Next review 12/27',
+    id:'m10448', num:'M03 10 448', name:'IV Therapy – General Guidelines', rev:'Revised 12/2025 · Next review 12/27',
     tag:'PIV',
     points:[
       'PIV placement requires a physician order; a saline lock may be inserted for sudden deterioration or when ordered treatments/tests require IV access.',
@@ -1831,7 +1831,7 @@ VW.policies = [
     related:'M03 10 605 Midline · M03 10 711 PICC · M03 10 112 CVAD · M03 10 299 Extravasation · M03 05 404 Limited Extremity Use'
   },
   {
-    id:'m10605', pdf:'policies/M03-10-605-midline-adult.pdf', num:'M03 10 605', name:'Midline Catheter – Adult', rev:'Originated 6/2025 · Next review 6/27',
+    id:'m10605', num:'M03 10 605', name:'Midline Catheter – Adult', rev:'Originated 6/2025 · Next review 6/27',
     tag:'Midline',
     points:[
       'A midline is peripheral access — upper arm via basilic, cephalic or brachial vein, tip at or near the axilla and distal to the shoulder.',
@@ -1850,7 +1850,7 @@ VW.policies = [
     related:'M03 10 711 PICC · M03 10 448 IV Therapy · M03 01 115 CHG · M03 10 299 Extravasation'
   },
   {
-    id:'m10711', pdf:'policies/M03-10-711-picc-usg-adult.pdf', num:'M03 10 711', name:'PICC / Ultrasound Guided Insertion – Adult', rev:'Revised 2/2026 · Next review 2/28',
+    id:'m10711', num:'M03 10 711', name:'PICC / Ultrasound Guided Insertion – Adult', rev:'Revised 2/2026 · Next review 2/28',
     tag:'PICC',
     points:[
       'PICC is inserted in the upper arm via basilic, cephalic or brachial vein with the tip at or near the SVC or cavo-atrial junction; right atrium acceptable under direct fluoroscopic visualization.',
@@ -1911,7 +1911,7 @@ VW.policies = [
     related:'M03 10 112 CVAD Adult · M03 10 711 PICC · M03 10 605 Midline'
   },
   {
-    id:'m10357', pdf:'policies/M03-10-357-hemodialysis-catheters.pdf', num:'M03 10 357', name:'Hemodialysis Catheters — CRRT, Apheresis or Dialysis', rev:'Revised 4/2025 · Next review 4/27',
+    id:'m10357', num:'M03 10 357', name:'Hemodialysis Catheters — CRRT, Apheresis or Dialysis', rev:'Revised 4/2025 · Next review 4/27',
     tag:'HD / Apheresis',
     points:[
       'CHG treatment before insertion of a temporary or tunneled dialysis catheter, and daily for all dialysis patients.',
@@ -1931,7 +1931,7 @@ VW.policies = [
     related:'M03 10 028 Alteplase for Central Line Occlusions · M03 10 112 CVAD · M03 01 115 CHG'
   },
   {
-    id:'m10299', pdf:'policies/M03-10-299-extravasation.pdf', num:'M03 10 299', name:'Extravasation / Infiltration of IV Drugs', rev:'Revised 9/2025 · Next review 9/26',
+    id:'m10299', num:'M03 10 299', name:'Extravasation / Infiltration of IV Drugs', rev:'Revised 9/2025 · Next review 9/26',
     tag:'Complication',
     points:[
       'Infiltration = inadvertent administration of a NON-vesicant into surrounding tissue. Extravasation = inadvertent administration of a VESICANT into surrounding tissue.',
@@ -1951,7 +1951,7 @@ VW.policies = [
     related:'M03 03 564 High Alert Medications · M03 10 112 CVAD · M03 10 298 Chemo Extravasation · M03 10 448 IV Therapy'
   },
   {
-    id:'m03564', pdf:'policies/M03-03-564-high-alert-meds.pdf', num:'M03 03 564', name:'Medication Safety — High Alert Medications', rev:'Revised 7/2026 · Next review 7/27',
+    id:'m03564', num:'M03 03 564', name:'Medication Safety — High Alert Medications', rev:'Revised 7/2026 · Next review 7/27',
     tag:'Med safety',
     points:[
       'High alert medications carry a high risk of injury or fatality when administered incorrectly.',
@@ -1973,7 +1973,7 @@ VW.policies = [
     related:'M03 10 299 Extravasation · M03 03 368 Heparin Infusion Management · M03 03 739 KCl Replacement · ISMP High-Alert List 2024'
   },
   {
-    id:'m10432', pdf:'policies/M03-10-432-intraosseous.pdf', num:'M03 10 432', name:'Intraosseous Needle Insertion, Care and Removal', rev:'Revised 3/2025 · Next review 3/27',
+    id:'m10432', num:'M03 10 432', name:'Intraosseous Needle Insertion, Care and Removal', rev:'Revised 3/2025 · Next review 3/27',
     tag:'IO',
     points:[
       'IO access places a vascular device with its tip in the bone matrix; used in emergent cases where central or peripheral access is unobtainable or delay would postpone lifesaving treatment.',
@@ -1991,7 +1991,7 @@ VW.policies = [
     related:'INS Standards 9th ed. 2024 · Lippincott Nursing Procedures 9th ed.'
   },
   {
-    id:'bd', pdf:'policies/BD-120470-powerflow-vs-powerport.pdf', num:'BD-120470', name:'BD PowerFlow vs PowerPort — technical comparison', rev:'© 2024 BD',
+    id:'bd', num:'BD-120470', name:'BD PowerFlow vs PowerPort — technical comparison', rev:'© 2024 BD',
     tag:'Manufacturer',
     points:[
       'PowerFlow implantable apheresis IV port: indicated for long-term therapeutic apheresis, blood withdrawal, medications, IV fluids, parenteral nutrition, blood products. Power injection of contrast to a maximum of 5 mL/s.',
@@ -2767,12 +2767,9 @@ VW.compatCheck = function (names) {
 <script>
 /* ============================================================
    Veinwise — policy document store
-   Two places a policy PDF can come from:
-     1. the app folder (policies/*.pdf, shipped with the build,
-        cached by the service worker so it opens offline)
-     2. IndexedDB, when Miguel attaches a newer revision himself
-   An attached copy always wins, because policies get revised and
-   the portal is the controlled document.
+   Full policy PDFs are never shipped with the app (they are internal
+   documents). Miguel attaches his own copy per policy; it is stored in
+   IndexedDB on this device only and opens offline.
    ============================================================ */
 VW.pdfs = (function () {
   const DB = 'veinwise-docs', STORE = 'pdf', VER = 1;
@@ -6567,7 +6564,7 @@ ICU-3 temp cvc ij tunneled
     const q = search.pol.toLowerCase();
     const list = VW.policies.filter(p => !q || (p.name + ' ' + p.num + ' ' + p.points.join(' ')).toLowerCase().includes(q));
     let html = `<div class="searchbar">${I.search}<input type="search" id="polSearch" placeholder="Search policies" value="${esc(search.pol)}"></div>
-      <div class="help" style="margin-bottom:12px">Open any policy to read the summary or the full PDF. The PDFs are stored in the app, so they open with no signal. If a policy is revised, attach the new file with the + and your copy is used from then on.</div>`;
+      <div class="help" style="margin-bottom:12px">Open any policy to read the summary. To read the full PDF, attach your copy with the + button — it is stored on this device only and opens with no signal.</div>`;
     html += `<div class="grid grid-2" style="margin-bottom:14px">
       <button class="btn btn-ghost" data-act="scale" data-kind="phleb" style="height:auto;padding:12px 10px;flex-direction:column;gap:2px"><b>Phlebitis scale</b><span class="muted" style="font-size:11.5px;font-weight:400">0 to 4+</span></button>
       <button class="btn btn-ghost" data-act="scale" data-kind="inf" style="height:auto;padding:12px 10px;flex-direction:column;gap:2px"><b>Infiltration scale</b><span class="muted" style="font-size:11.5px;font-weight:400">0 to 5+</span></button>
@@ -6577,16 +6574,16 @@ ICU-3 temp cvc ij tunneled
         <span style="flex:1"><b>${esc(p.name)}</b><br><span class="ref-sub">${esc(p.num)} · ${esc(p.rev)}</span></span>
         <span class="badge">${esc(p.tag)}</span></button>
       <div class="ref-body" hidden>
-        ${p.pdf ? `<div class="btn-row" style="margin-bottom:12px">
-          <button class="btn btn-primary" data-act="openPdf" data-id="${esc(p.id)}" style="flex:1;min-height:52px">${I.policy} Open the full policy</button>
-          <button class="icon-btn" data-act="attachPdf" data-id="${esc(p.id)}" aria-label="Attach a newer revision" title="Attach a newer revision">${I.plus}</button>
+        <div class="btn-row" style="margin-bottom:12px">
+          <button class="btn btn-primary" data-act="openPdf" data-id="${esc(p.id)}" style="flex:1;min-height:52px">${I.policy} ${pdfOverrides[p.id] ? 'Open your copy' : 'Attach the PDF'}</button>
+          <button class="icon-btn" data-act="attachPdf" data-id="${esc(p.id)}" aria-label="Attach the PDF" title="Attach the PDF">${I.plus}</button>
         </div>
         ${pdfOverrides[p.id] ? `<div class="callout tip" style="margin-bottom:12px"><b>Your copy</b>
           ${esc(pdfOverrides[p.id].name)} · attached ${fmtDate(dateKey(pdfOverrides[p.id].at))}.
-          <button class="btn btn-sm btn-ghost" data-act="dropPdf" data-id="${esc(p.id)}" style="margin-top:7px">Use the shipped copy instead</button></div>` : ''}` : ''}
+          <button class="btn btn-sm btn-ghost" data-act="dropPdf" data-id="${esc(p.id)}" style="margin-top:7px">Remove it</button></div>` : ''}
         <ul>${p.points.map(x => `<li>${esc(x)}</li>`).join('')}</ul>
         ${p.related ? `<h4>Related</h4><p class="muted">${esc(p.related)}</p>` : ''}
-        <div class="source">The bullets above are a summary. ${p.pdf ? 'Open the full policy for the controlled text.' : ''} When Veinwise and the policy portal disagree, the portal wins.</div>
+        <div class="source">The bullets above are a summary. When Veinwise and the policy portal disagree, the portal wins.</div>
       </div>
     </div>`).join('');
     return html;
@@ -6608,7 +6605,6 @@ ICU-3 temp cvc ij tunneled
   function openPdf(id) {
     const pol = VW.policies.find(p => p.id === id);
     if (!pol) return;
-    const shipped = pol.pdf;
     const showBlob = blob => {
       const url = URL.createObjectURL(blob);
       const w = window.open(url, '_blank');
@@ -6620,23 +6616,17 @@ ICU-3 temp cvc ij tunneled
       ? VW.pdfs.get(id).then(rec => { if (rec && rec.blob) { showBlob(rec.blob); return true; } return false; })
       : Promise.resolve(false);
 
-    step.then(done => {
-      if (done || !shipped) { if (!done && !shipped) toast('No document on file'); return; }
-      /* shipped copy: a plain link so Chrome uses its own PDF viewer */
-      return fetch(shipped, { method: 'GET' }).then(r => {
-        if (!r.ok) throw new Error('missing');
-        return r.blob();
-      }).then(showBlob);
-    }).catch(() => {
-      openSheet({
-        title: 'Policy document not here',
-        body: `<p>The summary above is in the app, but the PDF itself lives in the <b>policies</b> folder next to <b>index.html</b>.</p>
-          <p>Two ways to read it:</p>
-          <ul><li>Install Veinwise from GitHub Pages — the folder ships with it and the service worker caches it for offline.</li>
-          <li>Or attach your own copy now, straight from the phone. It is stored on this device only.</li></ul>`,
-        confirm: 'Attach a PDF',
-        onConfirm: () => setTimeout(() => attachPdf(id), 80)
-      });
+    step.then(done => { if (!done) attachPrompt(id); }).catch(() => attachPrompt(id));
+  }
+
+  /* No PDFs ship with the app — every full text is attached on demand
+     and lives in IndexedDB on this device only. */
+  function attachPrompt(id) {
+    openSheet({
+      title: 'No PDF on this device yet',
+      body: `<p>The summary above lives in the app. The full PDF is not stored here — attach your copy from the phone and it stays on this device only, opening with no signal.</p>`,
+      confirm: 'Attach a PDF',
+      onConfirm: () => setTimeout(() => attachPdf(id), 80)
     });
   }
 
