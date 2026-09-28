@@ -2772,7 +2772,7 @@ VW.compatCheck = function (names) {
    IndexedDB on this device only and opens offline.
    ============================================================ */
 VW.pdfs = (function () {
-  const DB = 'veinwise-docs', STORE = 'pdf', VER = 1;
+  const DB = 'veinwise-docs', STORE = 'pdf', VER = 2;
   let dbp = null;
 
   function db() {
@@ -2783,6 +2783,7 @@ VW.pdfs = (function () {
       rq.onupgradeneeded = () => {
         const d = rq.result;
         if (!d.objectStoreNames.contains(STORE)) d.createObjectStore(STORE, { keyPath: 'id' });
+        if (!d.objectStoreNames.contains('kv')) d.createObjectStore('kv', { keyPath: 'id' });
       };
       rq.onsuccess = () => res(rq.result);
       rq.onerror = () => rej(rq.error);
@@ -2820,6 +2821,46 @@ VW.pdfs = (function () {
         .then(rows => (rows || []).map(r => ({ id: r.id, name: r.name, size: r.size, at: r.at })))
         .catch(() => []);
     },
+    available() { return 'indexedDB' in window; }
+  };
+})();
+
+/* Small key/value store in the same IndexedDB (v2): the attached roster
+   file and anything else that must live on this device only. */
+VW.kv = (function () {
+  const DB = 'veinwise-docs', STORE = 'kv', VER = 2;
+  let dbp = null;
+
+  function db() {
+    if (dbp) return dbp;
+    dbp = new Promise((res, rej) => {
+      if (!('indexedDB' in window)) return rej(new Error('no indexedDB'));
+      const rq = indexedDB.open(DB, VER);
+      rq.onupgradeneeded = () => {
+        const d = rq.result;
+        if (!d.objectStoreNames.contains('pdf')) d.createObjectStore('pdf', { keyPath: 'id' });
+        if (!d.objectStoreNames.contains(STORE)) d.createObjectStore(STORE, { keyPath: 'id' });
+      };
+      rq.onsuccess = () => res(rq.result);
+      rq.onerror = () => rej(rq.error);
+    });
+    return dbp;
+  }
+
+  function tx(mode, fn) {
+    return db().then(d => new Promise((res, rej) => {
+      const t = d.transaction(STORE, mode);
+      const rq = fn(t.objectStore(STORE));
+      t.oncomplete = () => res(rq && rq.result);
+      t.onerror = () => rej(t.error);
+      t.onabort = () => rej(t.error);
+    }));
+  }
+
+  return {
+    put(id, rec) { return tx('readwrite', st => st.put(Object.assign({ id: id }, rec))); },
+    get(id) { return tx('readonly', st => st.get(id)).catch(() => null); },
+    del(id) { return tx('readwrite', st => st.delete(id)); },
     available() { return 'indexedDB' in window; }
   };
 })();
@@ -3907,8 +3948,9 @@ VW.consult.tipLocations = ['SVC', 'Cavo-atrial junction', 'Right atrium (fluoro-
     cartInventory: {}
   };
 
-  /* Official unit roster 2026-09-20..2026-11-14: date -> {day:{name:shift}, night:{name:shift}} */
-  /* Staff roster removed 2026-09-28 for privacy — the crew view now shows a notice instead. */
+  /* The staff roster is never shipped with the app. Miguel attaches his roster
+     file (Who's working > Attach roster file) and it is stored in IndexedDB on
+     this device only. */
   const ROSTER = {};
   let S = load();
   function load() {
@@ -6602,6 +6644,52 @@ ICU-3 temp cvc ij tunneled
     }).catch(() => { });
   }
 
+  let attachedRoster = null, rosterMeta = null;
+  function loadRosterIndex() {
+    if (!VW.kv.available()) return;
+    VW.kv.get('roster').then(rec => {
+      attachedRoster = (rec && rec.json) || null;
+      rosterMeta = rec ? { name: rec.name, at: rec.at } : null;
+      if (active === 'more' && sub.more === 'crew') render();
+    }).catch(() => { });
+  }
+
+  function validRoster(j) {
+    if (!j || typeof j !== 'object' || Array.isArray(j)) return false;
+    const keys = Object.keys(j).filter(k => /^\d{4}-\d{2}-\d{2}$/.test(k));
+    if (!keys.length) return false;
+    return keys.every(k => j[k] && typeof j[k] === 'object' &&
+      j[k].day && typeof j[k].day === 'object' && j[k].night && typeof j[k].night === 'object');
+  }
+
+  /* The staff roster is never shipped — Miguel attaches the JSON file and it
+     is stored in IndexedDB on this device only. */
+  function attachRoster() {
+    if (!VW.kv.available()) { toast('Storage is not available on this browser'); return; }
+    const inp = document.createElement('input');
+    inp.type = 'file'; inp.accept = 'application/json,.json';
+    inp.onchange = () => {
+      const f = inp.files[0]; if (!f) return;
+      const rd = new FileReader();
+      rd.onload = () => {
+        let j = null;
+        try { j = JSON.parse(rd.result); } catch (e) { toast('That file is not valid JSON'); return; }
+        if (!validRoster(j)) { toast("That file doesn't look like a roster"); return; }
+        VW.kv.put('roster', { name: f.name || 'roster.json', at: Date.now(), json: j })
+          .then(() => { toast('Roster attached'); loadRosterIndex(); })
+          .catch(() => toast('Could not save the roster'));
+      };
+      rd.readAsText(f);
+    };
+    inp.click();
+  }
+
+  function dropRoster() {
+    VW.kv.del('roster')
+      .then(() => { toast('Roster removed from this device'); loadRosterIndex(); })
+      .catch(() => toast('Could not remove the roster'));
+  }
+
   function openPdf(id) {
     const pol = VW.policies.find(p => p.id === id);
     if (!pol) return;
@@ -6756,17 +6844,19 @@ ICU-3 temp cvc ij tunneled
   }
   let crewDate = null;
   function viewCrew() {
-    const schedDates = [...new Set(S.schedule.map(x => x.date))].filter(d => ROSTER[d]).sort();
+    const R = attachedRoster || ROSTER;
+    const schedDates = [...new Set(S.schedule.map(x => x.date))].filter(d => R[d]).sort();
     let html = `<button class="btn btn-ghost btn-sm" data-submore="home" style="margin-bottom:12px">${I.back} More</button>
       <h1 class="view-title">Who's working</h1>
       <div class="view-sub">Your crew for each scheduled shift</div>`;
-    if (!Object.keys(ROSTER).length) return html + `<div class="empty"><b>Crew list removed</b>The staff roster was taken out of the app for privacy. Your own shifts are still in the Calendar.</div>`;
+    if (!Object.keys(R).length) return html + `<div class="empty"><b>No roster on this device</b>Attach your roster file and the crew list appears here. It stays on this phone only.</div>
+      <div class="btn-row" style="margin-top:12px"><button class="btn btn-primary" data-act="attachRoster" style="flex:1;min-height:52px">${I.plus} Attach roster file</button></div>`;
     if (!schedDates.length) return html + `<div class="empty"><b>No scheduled shifts yet</b>Add shifts in the Calendar and they will show up here.</div>`;
     const today = new Date(); const tk = today.getFullYear() + '-' + String(today.getMonth() + 1).padStart(2, '0') + '-' + String(today.getDate()).padStart(2, '0');
     if (!crewDate || schedDates.indexOf(crewDate) < 0) crewDate = schedDates.find(d => d >= tk) || schedDates[schedDates.length - 1];
     html += `<div class="chip-row" style="margin:14px 0 4px">` + schedDates.map(d =>
       `<button class="chip${d === crewDate ? ' on' : ''}" data-crewdate="${d}">${fmtDate(d)}</button>`).join('') + `</div>`;
-    const r = ROSTER[crewDate] || { day: {}, night: {} };
+    const r = R[crewDate] || { day: {}, night: {} };
     const isMe = n => n.toLowerCase().indexOf('narvaez') >= 0;
     const row = (n, s) => `<div class="list-row${isMe(n) ? ' me' : ''}"><div class="grow"><b>${esc(n)}</b><span>${fmtRosterShift(s)}</span></div>${isMe(n) ? '<span class="badge">You</span>' : ''}</div>`;
     html += `<h3 class="sec-h">Days</h3><div class="list">`;
@@ -6775,7 +6865,8 @@ ICU-3 temp cvc ij tunneled
     html += `</div><h3 class="sec-h">Nights</h3><div class="list">`;
     const nn = Object.keys(r.night).sort();
     html += nn.length ? nn.map(n => row(n, r.night[n])).join('') : `<div class="empty">No night staff listed</div>`;
-    html += `</div><div class="wordmark-foot">Roster 9/20/26\u201311/14/26</div>`;
+    html += `</div><div class="wordmark-foot">Roster on this device${rosterMeta ? ' \u00b7 ' + esc(rosterMeta.name) : ''}</div>`;
+    html += `<div class="btn-row" style="margin-top:12px"><button class="btn btn-sm btn-ghost" data-act="attachRoster" style="flex:1">Replace roster file</button><button class="btn btn-sm btn-ghost" data-act="dropRoster">Remove it</button></div>`;
     return html;
   }
 
@@ -7710,6 +7801,8 @@ ICU-3 temp cvc ij tunneled
       case 'openPdf': openPdf(id); break;
       case 'attachPdf': attachPdf(id); break;
       case 'dropPdf': dropPdf(id); break;
+      case 'attachRoster': attachRoster(); break;
+      case 'dropRoster': dropRoster(); break;
       case 'addNote': {
         const sh = cur(); const t = ($('#noteInput') || {}).value.trim();
         if (!sh || !t) { toast('Type a note first'); break; }
@@ -8027,6 +8120,7 @@ ICU-3 temp cvc ij tunneled
       else if (mq.addListener) mq.addListener(onFlip);
     }
     loadPdfIndex();
+    loadRosterIndex();
     document.addEventListener('keydown', e => {
       if (sheetStack.length) return;
       const tag = (e.target.tagName || '').toLowerCase();
