@@ -1,9 +1,9 @@
-/* Veinwise service worker, v32 (policy PDFs are attach-on-demand, on-device only)
+/* Veinwise Mobile service worker, v33 (policy PDFs are attach-on-demand, on-device only)
    The page itself is network-first so a new build shows up on the next open
    with signal, and the cached copy keeps it working offline. Everything else
    (intro, icons) is cache-first. Shift data lives in localStorage,
    which this file never touches. */
-const CACHE = 'veinwise-v32';
+const CACHE = 'veinwise-v33';
 const CORE = ['./', 'index.html', 'manifest.webmanifest', 'icon-192.png', 'icon-512.png', 'icon-maskable-512.png'];
 const EXTRA = ['intro.webm', 'intro.mp4'];
 
